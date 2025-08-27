@@ -184,6 +184,15 @@ fieldset.readonly {
           <button id="v_delete" class="danger">Sil</button>
           <button id="btnPurchaseInv">Alış Faturası</button>
           <button id="btnSalesInv">Satış Faturası</button>
+          <select id="tplSelect" title="Şablonlar">
+            <option value="">(Şablon seçin)</option>
+            <option value="gider">Gider Faturası</option>
+            <option value="tahsil">Müşteriden Tahsilat</option>
+            <option value="odeme">Satıcıya Ödeme</option>
+            <option value="kredi">Kredi Kullanımı</option>
+            <option value="demirbas">Demirbaş Alımı</option>
+            <option value="banka2kasa">Bankadan Kasaya</option>
+          </select>
         </div>
       </div>
 
@@ -649,7 +658,13 @@ fieldset.readonly {
   function parseDateInput(v){ if(!v) return null; const p=v.split('-'); if(p.length!==3) return null; return new Date(+p[0],+p[1]-1,+p[2]); }
   function dmyFromISO(iso){ const s=ymd(iso); const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m?`${m[3]}.${m[2]}.${m[1]}`:''; }
   function isoFromDMY(s){ if(!s)return''; const m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(s).trim()); if(!m)return''; return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`; }
-  
+  // 10.000–50.000 arası, son üç hanesi 000 olan (1000'in katı) rastgele tutar
+function randomThousandBetween(min=10000, max=50000){
+  const minK = Math.ceil(min/1000), maxK = Math.floor(max/1000);
+  const k = Math.floor(Math.random() * (maxK - minK + 1)) + minK;
+  return k * 1000;
+}
+
   function getAccName(code){
     return ACCOUNTS.find(a=>a.code===code)?.name || '';
   }
@@ -938,7 +953,7 @@ function setVoucherEditable(isEditable){
   });
 
   // Düzenlemeye etki eden araçlar
-  ['v_balance','v_delete','btnPurchaseInv','btnSalesInv'].forEach(id=>{
+  ['v_balance','v_delete','btnPurchaseInv','btnSalesInv','tplSelect'].forEach(id=>{
     const el = document.getElementById(id);
     if (el) el.disabled = !isEditable;
   });
@@ -1943,6 +1958,90 @@ function renderMizan(){
     if(firstInput) firstInput.focus();
 }
 
+// ---------- ŞABLONLAR (Dropdown) ----------
+// ---------- ŞABLONLAR (Dropdown) ----------
+function applyTemplateByKey(key){
+  // Pasif fişte çalışmasın
+  if (READONLY_MODE){
+    alert('Bu fiş pasif. Şablon kullanmak için "Fişi Güncelle" ile düzenlemeyi açın.');
+    document.getElementById('tplSelect').value = '';
+    return;
+  }
+
+  const tbody = document.querySelector('#voucherTable tbody');
+  tbody.innerHTML = '';
+
+  if (key === 'gider'){
+    // Gider Faturası
+    const base = randomThousandBetween(10000, 50000); // 10.000–50.000, 1000'in katı
+    const kdv  = base * 0.20;
+    const toplam = base + kdv;
+
+    addVoucherRow({ account:'632', debit: base,   desc:'gider faturası' });
+    addVoucherRow({ account:'191', debit: kdv,    desc:'gider faturası KDV' });
+    addVoucherRow({ account:'329', credit: toplam,desc:'gider faturası toplam' });
+
+    document.getElementById('v_desc').value = 'Gider Faturası';
+  }
+  else if (key === 'tahsil'){
+    // Müşteriden Tahsilat
+    const tutar = randomThousandBetween(10000, 50000);
+
+    addVoucherRow({ account:'102', debit: tutar,  desc:'müşteriden tahsilat' });
+    addVoucherRow({ account:'120', credit: tutar, desc:'müşteriden tahsilat' });
+
+    document.getElementById('v_desc').value = 'Müşteriden Tahsilat';
+  }
+  else if (key === 'odeme'){
+    // Satıcıya Ödeme
+    const tutar = randomThousandBetween(10000, 50000);
+
+    addVoucherRow({ account:'320', debit: tutar,  desc:'satıcıya ödeme' });
+    addVoucherRow({ account:'102', credit: tutar, desc:'satıcıya ödeme' });
+
+    document.getElementById('v_desc').value = 'Satıcıya Ödeme';
+  }
+  else if (key === 'kredi'){
+    // Kredi Kullanımı (talebe göre 300 borç, 102 alacak)
+    const tutar = randomThousandBetween(10000, 50000);
+
+    addVoucherRow({ account:'102', debit: tutar,  desc:'kredi kullanımı' });
+    addVoucherRow({ account:'300', credit: tutar, desc:'kredi kullanımı' });
+
+    document.getElementById('v_desc').value = 'Kredi Kullanımı';
+  }
+  else if (key === 'demirbas'){
+    // Demirbaş Alımı
+    const tutar = randomThousandBetween(10000, 50000);
+
+    addVoucherRow({ account:'255', debit: tutar,  desc:'demirbaş alımı' });
+    addVoucherRow({ account:'329', credit: tutar, desc:'demirbaş alımı' });
+
+    document.getElementById('v_desc').value = 'Demirbaş Alımı';
+  }
+  else if (key === 'banka2kasa'){
+    // Bankadan Kasaya
+    const tutar = randomThousandBetween(10000, 50000);
+
+    addVoucherRow({ account:'100', debit: tutar,  desc:'bankadan kasaya' });
+    addVoucherRow({ account:'102', credit: tutar, desc:'bankadan kasaya' });
+
+    document.getElementById('v_desc').value = 'Bankadan Kasaya';
+  }
+
+  markDirty();
+  recalcVoucherTotals();
+
+  // İlk satırın ilk alanına odak
+  const first = tbody.querySelector('tr:first-child select, tr:first-child input');
+  if(first){ first.focus(); }
+
+  // Seçimi sıfırla
+  const sel = document.getElementById('tplSelect');
+  if (sel) sel.value = '';
+}
+
+
   function createSalesInvoice(){
     const tbody = document.querySelector('#voucherTable tbody');
     tbody.innerHTML = '';
@@ -2058,6 +2157,12 @@ function renderMizan(){
     document.getElementById('v_delete').addEventListener('click', deleteVoucher);
     document.getElementById('btnPurchaseInv').addEventListener('click', createPurchaseInvoice);
     document.getElementById('btnSalesInv').addEventListener('click', createSalesInvoice);
+
+    // Şablon seçimi
+    document.getElementById('tplSelect').addEventListener('change', (e)=>{
+      const val = e.target.value;
+      if (val) applyTemplateByKey(val);
+    });
 
     // Mizan
     document.getElementById('btnMizan').addEventListener('click', renderMizan);
