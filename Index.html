@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genel Muhasebe (Tek Dosya)</title>
+  <style>
+    :root{ --bg:#f7f7f9; --card:#fff; --text:#111; --muted:#6b7280; --line:#e5e7eb; --brand:#111827; }
+    *{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    .container{max-width:1100px; margin:28px auto; padding:0 16px}
+    h1{margin:0 0 16px; font-size:28px}
+    fieldset{border:1px solid var(--line); background:var(--card); border-radius:14px; padding:14px; margin:14px 0}
+    legend{padding:0 6px; font-weight:700; display:flex; align-items:center; gap:8px;}
+    label{display:block; font-weight:600; margin:6px 0}
+    input[type="text"],input[type="date"],select,button{border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:14px; background:white}
+    button{cursor:pointer}
+    button.primary{background:var(--brand); color:#fff; border-color:#000; box-shadow:0 1px 0 rgba(0,0,0,.08)}
+    button:disabled{opacity:.55; cursor:not-allowed}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    .row > div{flex:1 1 180px}
+    table{width:100%; border-collapse:collapse; margin-top:10px; background:white; border-radius:10px; overflow:hidden}
+    th,td{border:1px solid var(--line); padding:6px 8px; font-size:13px; text-align:left;}
+    th{background:#e5e7eb; font-weight:700}
+    td.right, th.right{text-align:right}
+    .muted{color:var(--muted)}
+    .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .pill{padding:4px 8px; border:1px solid var(--line); border-radius:999px; background:#fff}
+    .danger{background:#b91c1c; color:#fff; border-color:#7f1d1d}
+    .hint{font-size:12px; color:#6b7280}
+    .warn{ background:#fff1f2; }
+    .warn td{ color:#991b1b; }
+    input[readonly]{ background:#f3f4f6; color:#6b7280; }
+
+/* --- TABLO HİZALAMA DÜZELTMELERİ --- */
+
+/* Sayı hücreleri: tek satır, sağa hizalı, tabular rakam */
+td.right, th.right{
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Mizan tablosunda sabit kolon düzeni: th width'leri tutulsun */
+#mizanTable{ table-layout: fixed; }
+
+/* Mizan’da uzun metin beklenen kolonlarda (Adı, Not) kırılmaya izin ver */
+#mizanTable td:nth-child(2),
+#mizanTable th:nth-child(2),
+#mizanTable td:nth-child(8),
+#mizanTable th:nth-child(8){
+  white-space: normal;
+  word-break: break-word;
+}
+
+    /* Fiş tablosu başlıklarını ortala */
+    #voucherTable thead th{ text-align:center !important; }
+
+    /* Açılır-kapanır alanlar */
+    .collapsed-content { display: none; }
+    .collapsed-content.is-expanded { display: block; }
+    .toggle-btn { background: none; border: none; font-weight: bold; font-size: 1.2em; cursor: pointer; padding: 0; margin-right: 8px; }
+/* Fiş tablosu "Hesap Kodu" sütununun genişliğini sabit tutar */
+#voucherTable tbody td:first-child {
+  /* Hücrenin, içindeki uzun metne göre genişlemesini engeller.
+     Başlıkta belirtilen 210px değerini aşmaması için maksimum genişlik veriyoruz. */
+  max-width: 210px;
+}
+
+/* Genişliği sabitlenen hücre içindeki select kutusunun taşmasını engeller */
+
+#voucherTable tbody td:first-child select {
+  width: 100%;
+  box-sizing: border-box; /* Kenar boşluklarının genişliğe dahil edilmesini sağlar */
+  text-overflow: ellipsis; /* Hücreye sığmayan metni "..." ile kısaltır */
+}
+
+/* Açıklama hücresindeki input tam genişlik olsun */
+#voucherTable td:nth-child(4) input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Hesap ekstresi raporunda 3. sütun (Açıklama) genişliği */
+.report table th:nth-child(3),
+.report table td:nth-child(3) {
+  width: 100px;         /* istediğin px değerini ayarla */
+  max-width: 100px;
+  white-space: nowrap;  
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* --- PASİF (okunur) FİŞ GÖRÜNÜMÜ --- */
+#voucherTable input:disabled,
+#voucherTable select:disabled {
+  background:#f3f4f6;
+  color:#6b7280;           /* metinler gri */
+}
+#voucherTable input.right:disabled {
+  color:#9ca3af;           /* rakamları biraz daha soluk gri */
+}
+
+/* Fiş alanı pasifken görsel ipucu (opsiyonel) */
+fieldset.readonly {
+  outline: 2px dashed #e5e7eb;
+}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Genel Muhasebe Programı</h1>
+
+    <fieldset>
+      <legend>Fiş Girişi</legend>
+      <div class="row">
+        <div>
+          <label for="v_tarih">Tarih</label>
+          <input type="date" id="v_tarih" />
+        </div>
+        <div>
+          <label for="v_fisno">Fiş No</label>
+          <input type="text" id="v_fisno" placeholder="örn. 1" readonly title="Fiş No program tarafından verilir" />
+        </div>
+        <div style="flex:2">
+          <label for="v_desc">Fiş Açıklaması</label>
+          <input type="text" id="v_desc" placeholder="Fiş açıklaması (opsiyonel)" maxlength="50" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <div style="flex:2">
+          <label for="v_select">Kayıtlı Fişler</label>
+          <select id="v_select" style="min-width:320px"></select>
+        </div>
+        <!-- ÜST SATIR: Yükle + Gezinti (sağa hizalı) -->
+        <div class="toolbar" style="align-self:end; margin-left:auto; display:flex; gap:8px">
+          <button id="v_load">Yükle</button>
+          <button id="v_edit" class="primary" title="Bu fişi düzenlemeye aç">Fişi Güncelle</button>
+          <button id="v_prev" title="Listedeki bir önceki fişi yükle">← Önceki Fiş</button>
+          <button id="v_next" title="Listedeki bir sonraki fişi yükle">Sonraki Fiş →</button>
+        </div>
+      </div>
+
+      <table id="voucherTable">
+        <thead>
+          <tr>
+            <th style="width:210px">Hesap Kodu ve Adı</th>
+            <th class="right" style="width:140px">Borç</th>
+            <th class="right" style="width:140px">Alacak</th>
+            <th>Açıklama</th>
+            <th style="width:90px">Kopyala</th>
+            <th style="width:80px">Sil</th>
+            <th style="width:90px">Ekle</th>
+          </tr>
+        </thead>
+
+        
+        <tbody></tbody>
+        <tfoot>
+          <tr>
+            <th class="right">TOPLAM</th>
+            <th id="v_tdb" class="right">0,00</th>
+            <th id="v_tcr" class="right">0,00</th>
+            <th colspan="4"></th>
+          </tr>
+        </tfoot>
+      </table>
+      <!-- Alt buton grupları tek satırda hizalı -->
+      <div class="toolbar" style="margin-top:8px; display:flex; justify-content:space-between; gap:8px">
+
+        <!-- Sol taraf -->
+        <div style="display:flex; gap:8px">
+          <button id="v_balance">Kalanı Dengele</button>
+          <button id="v_save" class="primary" disabled>Kaydet</button>
+          <span id="v_msg" class="muted" role="status" aria-live="polite"></span>
+        </div>
+
+        <!-- Sağ taraf -->
+        <div style="display:flex; gap:8px">
+          <button id="v_new">Yeni</button>
+          <button id="v_delete" class="danger">Sil</button>
+          <button id="btnPurchaseInv">Alış Faturası</button>
+          <button id="btnSalesInv">Satış Faturası</button>
+        </div>
+      </div>
+
+    </fieldset>
+
+    <fieldset>
+      <legend><button class="toggle-btn" id="toggleMizan" aria-expanded="false" aria-controls="mizanContent">[+]</button>Mizan</legend>
+      <div id="mizanContent" class="collapsed-content">
+        <div class="row">
+          <div>
+            <label for="mzFrom">Başlangıç</label>
+            <input type="date" id="mzFrom" />
+          </div>
+          <div>
+            <label for="mzTo">Bitiş</label>
+            <input type="date" id="mzTo" />
+          </div>
+          <div style="align-self:end" class="toolbar">
+            <button id="btnMizan">Yenile</button>
+          </div>
+        </div>
+        <table id="mizanTable">
+          <thead>
+            <tr>
+              <th style="width:130px">Hesap Kodu</th>
+              <th>Adı</th>
+              <th class="right">Toplam Borç</th>
+              <th class="right">Toplam Alacak</th>
+              <th class="right">Borç Bakiye</th>
+              <th class="right">Alacak Bakiye</th>
+              <th style="width:60px">Taraf</th>
+              <th>Not</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <th colspan="2" class="right">GENEL TOPLAM</th>
+              <th id="tDB" class="right">0,00</th>
+              <th id="tCR" class="right">0,00</th>
+              <th id="tBorcBakiye" class="right">0,00</th>
+              <th id="tAlacakBakiye" class="right">0,00</th>
+              <th colspan="2"></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><button class="toggle-btn" id="toggleReports" aria-expanded="false" aria-controls="reportsContent">[+]</button>Raporlar (Yeni Sekmede)</legend>
+      <div id="reportsContent" class="collapsed-content">
+        <div class="row">
+          <div>
+            <label for="rpFrom">Başlangıç</label>
+            <input type="date" id="rpFrom" />
+          </div>
+          <div>
+            <label for="rpTo">Bitiş</label>
+            <input type="date" id="rpTo" />
+          </div>
+          <div style="flex:2">
+            <label for="rpAccount">Hesap (Ekstre)</label>
+            <select id="rpAccount"></select>
+          </div>
+        </div>
+        <div class="toolbar" style="margin-top:8px">
+          <button id="rpJournal">Yevmiye Dökümü</button>
+          <button id="rpLedger">Hesap Ekstresi</button>
+          <button id="rpTrial">Mizan Raporu</button>
+          <button id="rpVoucher">Seçili Fiş Baskısı</button>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><button class="toggle-btn" id="toggleData" aria-expanded="false" aria-controls="dataContent">[+]</button>Veri Yönetimi</legend>
+      <div id="dataContent" class="collapsed-content">
+        <div class="toolbar">
+          <button id="btnExport">Verileri Dışa Aktar (JSON)</button>
+          <label class="pill"> JSON Yükle
+            <input type="file" id="fileImport" accept=".json,application/json" style="display:none" />
+          </label>
+
+          <button id="btnExportTSV">Fişleri Dışa Aktar (TSV)</button>
+          <label class="pill"> Fişleri Yükle (TSV)
+            <input type="file" id="fileImportTSV"
+                   accept=".tsv,text/tab-separated-values,text/plain"
+                   style="display:none" />
+          </label>
+
+          <button id="btnExportAccountsTSV">Hesap Planı Dışa Aktar (TSV)</button>
+          <label class="pill"> Hesap Planı Yükle (TSV)
+            <input type="file" id="fileImportAccountsTSV"
+                   accept=".tsv,text/tab-separated-values,text/plain"
+                   style="display:none" />
+          </label>
+          
+          <button id="btnClear" class="danger">Tüm Verileri Temizle</button>
+          <span class="muted">Veriler bu tarayıcıda <b>localStorage</b> ile saklanır.</span>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="hint">© Tek dosya demo. Hesap planı sabittir: 100/120/153/191/320/391/600/500.</div>
+  </div>
+
+<script>
+  // =====================
+  // BASİT MUHASEBE - Tek Dosya (Hesap Planı SABİT)
+  // =====================
+
+  // --- Kaydet mesajı kontrolü ve "dirty" takibi ---
+  let FORM_DIRTY = false;
+  let READONLY_MODE = false; // pasif fişte true
+  function setSavedMessage(visible){
+    const msg = document.getElementById('v_msg');
+    msg.textContent = visible ? '✔ Kaydedildi' : '';
+    if(visible){
+      const ticket = Symbol(); setSavedMessage._t = ticket;
+      setTimeout(()=>{ if(setSavedMessage._t===ticket && !FORM_DIRTY) msg.textContent=''; }, 3000);
+    }
+  }
+  function markDirty(){
+    FORM_DIRTY = true;
+    setSavedMessage(false);
+  }
+
+  // --- Son kullanılan/odaklanan hesap ve odak satırı ---
+  let LAST_USED_ACCOUNT = '';
+  let CURRENT_VOUCHER_ROW = null; // imlecin (focus) olduğu tr
+
+   let ACCOUNTS = [
+    {code:'100', name:'KASA', side:'B'},
+    {code:'101', name:'ALINAN ÇEKLER', side:'B'},
+    {code:'102', name:'BANKALAR', side:'B'},
+    {code:'103', name:'VERİLEN ÇEKLER VE ÖDEME EMİRLERİ (-)', side:'A'},
+    {code:'108', name:'DİĞER HAZIR DEĞERLER', side:'B'},
+    {code:'110', name:'HİSSE SENETLERİ', side:'B'},
+    {code:'111', name:'ÖZEL KESİM,TAHVİL SENET VE BONOLARI', side:'B'},
+    {code:'112', name:'KAMU KESİMİ,TAHVİL SENET VE BONOLARI', side:'B'},
+    {code:'118', name:'DİĞER MENKUL KIYMETLER', side:'B'},
+    {code:'119', name:'MENKUL KIYMETLER DEĞER DÜŞÜKLÜĞÜ KAR.(-)', side:'A'},
+    {code:'120', name:'ALICILAR', side:'B'},
+    {code:'121', name:'ALACAK SENETLERİ', side:'B'},
+    {code:'122', name:'ALACAK SENETLERİ REESKONTU (-)', side:'A'},
+    {code:'126', name:'VERİLEN DEPOZİTO VE TEMİNATLAR', side:'B'},
+    {code:'127', name:'DİĞER TİCARİ ALACAKLAR', side:'B'},
+    {code:'128', name:'ŞÜPHELİ TİCARİ ALACAKLAR', side:'B'},
+    {code:'129', name:'ŞÜPHELİ TİCARİ ALACAKLAR KARŞILIĞI (-)', side:'A'},
+    {code:'131', name:'ORTAKLARDAN ALACAKLAR', side:'B'},
+    {code:'132', name:'İŞTİRAKLERDEN ALACAKLAR', side:'B'},
+    {code:'133', name:'BAĞLI ORTAKLIKLARDAN ALACAKLAR', side:'B'},
+    {code:'135', name:'PERSONELDEN ALACAKLAR', side:'B'},
+    {code:'136', name:'DİĞER ÇEŞİTLİ ALACAKLAR', side:'B'},
+    {code:'137', name:'DİĞER ALACAK SENETLERİ REESKONTU (-)', side:'A'},
+    {code:'138', name:'ŞÜPHELİ DİĞER ALACAKLAR', side:'B'},
+    {code:'139', name:'ŞÜPHELİ DİĞER ALACAKLAR KARŞILIĞI (-)', side:'A'},
+    {code:'150', name:'İLK MADDE VE MALZEME', side:'B'},
+    {code:'151', name:'YARI MAMULLER-ÜRETİM', side:'B'},
+    {code:'152', name:'MAMULLER', side:'B'},
+    {code:'153', name:'TİCARİ MALLAR', side:'B'},
+    {code:'157', name:'DİĞER STOKLAR', side:'B'},
+    {code:'158', name:'STOK DEĞER DÜŞÜKLÜĞÜ KARŞILIĞI (-)', side:'A'},
+    {code:'159', name:'VERİLEN SİPARİŞ AVANSLARI', side:'B'},
+    {code:'170', name:'YILLARA YAYGIN İNŞAAT VE ONARIM MALİYET.', side:'B'},
+    {code:'179', name:'TAŞERONLARA VERİLEN AVANSLAR', side:'B'},
+    {code:'180', name:'GELECEK AYLARA AİT GİDERLER', side:'B'},
+    {code:'181', name:'GELİR TAHAKKUKLARI', side:'B'},
+    {code:'190', name:'DEVREDEN KDV', side:'B'},
+    {code:'191', name:'İNDİRİLECEK KDV', side:'B'},
+    {code:'192', name:'DİĞER KDV', side:'B'},
+    {code:'193', name:'PEŞİN ÖDENEN VERGİLER VE FONLAR', side:'B'},
+    {code:'195', name:'İŞ AVANSLARI', side:'B'},
+    {code:'196', name:'PERSONEL AVANSLARI', side:'B'},
+    {code:'197', name:'SAYIM VE TESELLÜM NOKSANLARI', side:'B'},
+    {code:'198', name:'DİĞER ÇEŞİTLİ DÖNEN VARLIKLAR', side:'B'},
+    {code:'199', name:'DİĞER DÖNEN VARLIKLAR KARŞILIĞI (-)', side:'A'},
+    {code:'220', name:'ALICILAR', side:'B'},
+    {code:'221', name:'ALACAK SENETLERİ', side:'B'},
+    {code:'222', name:'ALACAK SENETLERİ REESKONTU (-)', side:'A'},
+    {code:'226', name:'VERİLEN DEPOZİTO VE TEMİNATLAR', side:'B'},
+    {code:'229', name:'ŞÜPHELİ TİCARİ ALACAKLAR KARŞILIĞI (-)', side:'A'},
+    {code:'231', name:'ORTAKLARDAN ALACAKLAR', side:'B'},
+    {code:'232', name:'İŞTİRAKLERDEN ALACAKLAR', side:'B'},
+    {code:'233', name:'BAĞLI ORTAKLIKLARDAN ALACAKLAR', side:'B'},
+    {code:'235', name:'PERSONELDEN ALACAKLAR', side:'B'},
+    {code:'236', name:'DİĞER ÇEŞİTLİ ALACAKLAR', side:'B'},
+    {code:'237', name:'DİĞER ALACAK SENETLERİ REESKONTU (-)', side:'A'},
+    {code:'239', name:'ŞÜPHELİ DİĞER ALACAKLAR KARŞILIĞI (-)', side:'A'},
+    {code:'240', name:'BAĞLI MENKUL KIYMETLER', side:'B'},
+    {code:'241', name:'BAĞLI MENKUL KIYMETLER DEĞ.DÜŞ.KARŞI.(-)', side:'A'},
+    {code:'242', name:'İŞTİRAKLER', side:'B'},
+    {code:'243', name:'İŞTİRAKLERE SERMAYE TAAHHÜTLERİ (-)', side:'A'},
+    {code:'244', name:'İŞTİRAKLER SERMAYE PAY.DEĞ.DÜŞ.KARŞ.(-)', side:'A'},
+    {code:'245', name:'BAĞLI ORTAKLIKLAR', side:'B'},
+    {code:'246', name:'BAĞLI ORTAKLIKLARA SERMAYE TAAHHÜTLE.(-)', side:'A'},
+    {code:'247', name:'BAĞLI ORTAKLIKLAR SER.PAY.DEĞ.DÜŞ.KAR(-)', side:'A'},
+    {code:'248', name:'DİĞER MALİ DURAN VARLIKLAR', side:'B'},
+    {code:'249', name:'DİĞER MALİ DURAN VARLIKLAR KARŞILIĞI (-)', side:'A'},
+    {code:'250', name:'ARAZİ VE ARSALAR', side:'B'},
+    {code:'251', name:'YERALTI VE YERÜSTÜ DÜZENLERİ', side:'B'},
+    {code:'252', name:'BİNALAR', side:'B'},
+    {code:'253', name:'TESİS, MAKİNE VE CİHAZLAR', side:'B'},
+    {code:'254', name:'TAŞITLAR', side:'B'},
+    {code:'255', name:'DEMİRBAŞLAR', side:'B'},
+    {code:'256', name:'DİĞER MADDİ DURAN VARLIKLAR', side:'B'},
+    {code:'257', name:'BİRİKMİŞ AMORTİSMANLAR (-)', side:'A'},
+    {code:'258', name:'YAPILMAKTA OLAN YATIRIMLAR', side:'B'},
+    {code:'259', name:'VERİLEN AVANSLAR', side:'B'},
+    {code:'260', name:'HAKLAR', side:'B'},
+    {code:'261', name:'ŞEREFİYE', side:'B'},
+    {code:'262', name:'KURULUŞ VE ÖRGÜTLENME GİDERLERİ', side:'B'},
+    {code:'263', name:'ARAŞTIRMA VE GELİŞTİRME GİDERLERİ', side:'B'},
+    {code:'264', name:'ÖZEL MALİYETLER', side:'B'},
+    {code:'267', name:'DİĞER MADDİ OLMAYAN DURAN VARLIKLAR', side:'B'},
+    {code:'268', name:'BİRİKMİŞ AMORTİSMANLAR (-)', side:'A'},
+    {code:'269', name:'VERİLEN AVANSLAR', side:'B'},
+    {code:'271', name:'ARAMA GİDERLERİ', side:'B'},
+    {code:'272', name:'HAZIRLIK VE GELİŞTİRME GİDERLERİ', side:'B'},
+    {code:'277', name:'DİĞER ÖZEL TÜKENMEYE TABİ VARLIKLAR', side:'B'},
+    {code:'278', name:'BİRİKMİŞ TÜKENME PAYLARI (-)', side:'A'},
+    {code:'279', name:'VERİLEN AVANSLAR', side:'B'},
+    {code:'280', name:'GELECEK YILLARA AİT GİDERLER', side:'B'},
+    {code:'281', name:'GELİR TAHAKKUKLARI', side:'B'},
+    {code:'291', name:'GELECEK YILLARDA İNDİRİLECEK KDV', side:'B'},
+    {code:'292', name:'DİĞER KDV', side:'B'},
+    {code:'293', name:'GELECEK YILLAR İHTİYACI STOKLAR', side:'B'},
+    {code:'294', name:'ELDEN ÇIKARI. STOKLAR VE MADDİ DUR. VAR.', side:'B'},
+    {code:'295', name:'PEŞİN ÖDENEN VERGİLER VE FONLAR', side:'B'},
+    {code:'297', name:'DİĞER ÇEŞİTLİ DURAN VARLIKLAR', side:'B'},
+    {code:'298', name:'STOK DEĞER DÜŞÜKLÜĞÜ KARŞILIĞI (-)', side:'A'},
+    {code:'299', name:'BİRİKMİŞ AMORTİSMANLAR (-)', side:'A'},
+    {code:'300', name:'BANKA KREDİLERİ', side:'A'},
+    {code:'301', name:'FINANSAL KIRALAMA İŞLEMLERINDEN BORÇLAR', side:'A'},
+    {code:'302', name:'ERTELENMIŞ FIN. KIR. BORÇLANMA MLYT. (-)', side:'B'},
+    {code:'303', name:'UZUN VAD.KREDİLERİN ANAPARA TAK. VE FAİZ', side:'A'},
+    {code:'304', name:'TAHVİL ANAPARA BORÇ, TAKSİT VE FAİZLERİ', side:'A'},
+    {code:'305', name:'ÇIKARILMIŞ BONOLAR VE SENETLER', side:'A'},
+    {code:'306', name:'ÇIKARILMIŞ DİĞER MENKUL KIYMETLER', side:'A'},
+    {code:'308', name:'MENKUL KIYMETLER İHRAÇ FARKLARI (-)', side:'B'},
+    {code:'309', name:'DİĞER MALİ BORÇLAR', side:'A'},
+    {code:'320', name:'SATICILAR', side:'A'},
+    {code:'321', name:'BORÇ SENETLERİ', side:'A'},
+    {code:'322', name:'BORÇ SENETLERİ REESKONTU (-)', side:'B'},
+    {code:'326', name:'ALINAN DEPOZİTO VE TEMİNATLAR', side:'A'},
+    {code:'329', name:'DİĞER TİCARİ BORÇLAR', side:'A'},
+    {code:'331', name:'ORTAKLARA BORÇLAR', side:'A'},
+    {code:'332', name:'İŞTİRAKLERE BORÇLAR', side:'A'},
+    {code:'333', name:'BAĞLI ORTAKLIKLARA BORÇLAR', side:'A'},
+    {code:'335', name:'PERSONELE BORÇLAR', side:'A'},
+    {code:'336', name:'DİĞER ÇEŞİTLİ BORÇLAR', side:'A'},
+    {code:'337', name:'DİĞER BORÇ SENETLERİ REESKONTU (-)', side:'B'},
+    {code:'340', name:'ALINAN SİPARİŞ AVANSLARI', side:'A'},
+    {code:'349', name:'ALINAN DİĞER AVANSLAR', side:'A'},
+    {code:'350', name:'YIL.YAYGIN İNŞ. VE ONARIM HAKEDİŞ BEDEL.', side:'A'},
+    {code:'360', name:'ÖDENECEK VERGİ VE FONLAR', side:'A'},
+    {code:'361', name:'ÖDENECEK SOSYAL GÜVENLİK KESİNTİLERİ', side:'A'},
+    {code:'368', name:'VAD.GEÇ., ERT. VEYA TAKS. VERGİ VE Dİ.YÜ', side:'A'},
+    {code:'369', name:'ÖDENECEK DİĞER YÜKÜMLÜLÜKLER', side:'A'},
+    {code:'370', name:'DÖNEM KARI VERGİ VE Dİ.YAS.YÜK.KARŞILIK.', side:'A'},
+    {code:'371', name:'DÖN.KARININ PEŞ.ÖD.VER.VE DİĞ.YÜKÜM.(-)', side:'B'},
+    {code:'372', name:'KIDEM TAZMİNATI KARŞILIĞI', side:'A'},
+    {code:'373', name:'MALİYET GİDERLERİ KARŞILIĞI (-)', side:'B'},
+    {code:'379', name:'DİĞER BORÇ VE GİDER KARŞILIKLARI', side:'A'},
+    {code:'380', name:'GELECEK AYLARA AİT GELİRLER', side:'A'},
+    {code:'381', name:'GİDER TAHAKKUKLARI', side:'A'},
+    {code:'391', name:'HESAPLANAN KDV', side:'A'},
+    {code:'392', name:'DİĞER KDV', side:'A'},
+    {code:'393', name:'MERKEZ VE ŞUBELER CARİ HESABI', side:'A'},
+    {code:'397', name:'SAYIM VE TESELLÜM FAZLALARI', side:'A'},
+    {code:'399', name:'DİĞER ÇEŞİTLİ YABANCI KAYNAKLAR', side:'A'},
+    {code:'400', name:'BANKA KREDİLERİ', side:'A'},
+    {code:'401', name:'FINANSAL KIRALAMA İŞLEMLERINDEN BORÇLAR', side:'A'},
+    {code:'402', name:'ERTELENMIŞ FIN. KIR. BORÇLANMA MLYT. (-)', side:'B'},
+    {code:'405', name:'ÇIKARILMIŞ TAHVİLLER', side:'A'},
+    {code:'407', name:'ÇIKARILMIŞ DİĞER MENKUL KIYMETLER', side:'A'},
+    {code:'408', name:'MENKUL KIYMETLER İHRAÇ FARKLARI (-)', side:'B'},
+    {code:'409', name:'DİĞER MALİ BORÇLAR', side:'A'},
+    {code:'420', name:'SATICILAR', side:'A'},
+    {code:'421', name:'BORÇ SENETLERİ', side:'A'},
+    {code:'422', name:'BORÇ SENETLERİ REESKONTU (-)', side:'B'},
+    {code:'426', name:'ALINAN DEPOZİTO VE TEMİNATLAR', side:'A'},
+    {code:'429', name:'DİĞER TİCARİ BORÇLAR', side:'A'},
+    {code:'431', name:'ORTAKLARA BORÇLAR', side:'A'},
+    {code:'432', name:'İŞTİRAKLERE BORÇLAR', side:'A'},
+    {code:'433', name:'BAĞLI ORTAKLIKLARA BORÇLAR', side:'A'},
+    {code:'436', name:'DİĞER ÇEŞİTLİ BORÇLAR', side:'A'},
+    {code:'437', name:'DİĞER BORÇ SENETLERİ REESKONTU (-)', side:'B'},
+    {code:'438', name:'KAMUYA OLAN ERT.VEYA TAKS. BORÇLAR', side:'A'},
+    {code:'440', name:'ALINAN SİPARİŞ AVANSLARI', side:'A'},
+    {code:'449', name:'ALINAN DİĞER AVANSLAR', side:'A'},
+    {code:'472', name:'KIDEM TAZMİNATI KARŞILIĞI', side:'A'},
+    {code:'479', name:'DİĞER BORÇ VE GİDER KARŞILIKLARI', side:'A'},
+    {code:'480', name:'GELECEK YILLARA AİT GELİRLER', side:'A'},
+    {code:'481', name:'GİDER TAHAKKUKLARI', side:'A'},
+    {code:'492', name:'GELECEK YIL. ERT. VEYA TERK. EDİLE. KDV', side:'A'},
+    {code:'493', name:'TESİSE KATILMA PAYLARI', side:'A'},
+    {code:'499', name:'DİĞER ÇEŞ. UZUN VAD. YABANCI KAYNAKLAR', side:'A'},
+    {code:'500', name:'SERMAYE', side:'A'},
+    {code:'501', name:'ÖDENMEMİŞ SERMAYE (-)', side:'B'},
+    {code:'502', name:'SERMAYE DÜZELTMESİ OLUMLU FARKLARI', side:'A'},
+    {code:'503', name:'SERMAYE DÜZELTMESİ OLUMSUZ FARKLARI (-)', side:'B'},
+    {code:'520', name:'HİSSE SENETLERİ İHRAÇ PRİMLERİ', side:'A'},
+    {code:'521', name:'HİSSE SENEDİ İPTAL KARLARI', side:'A'},
+    {code:'522', name:'MADDİ DURAN VARLIK YENİ. DEĞ. ARTIŞLARI', side:'A'},
+    {code:'523', name:'İŞTİRAKLER YENİDEN DEĞERLEME ARTIŞLARI', side:'A'},
+    {code:'524', name:'MALİYET ARTIŞ FONU', side:'A'},
+    {code:'525', name:'KAYDA ALINAN EMTİA KARŞILIĞI', side:'A'},
+    {code:'526', name:'DEMİRBAŞ MAKİNE VE TEÇHİZAT KARŞILIĞI', side:'A'},
+    {code:'529', name:'DİĞER SERMAYE YEDEKLERİ', side:'A'},
+    {code:'540', name:'YASAL YEDEKLER', side:'A'},
+    {code:'541', name:'STATÜ YEDEKLERİ', side:'A'},
+    {code:'542', name:'OLAĞANÜSTÜ YEDEKLER', side:'A'},
+    {code:'544', name:'SERMAYEYE EKL.İŞTİ.HİS.VE GAYRİ.SAT.KAZ.', side:'A'},
+    {code:'548', name:'DİĞER KAR YEDEKLERİ', side:'A'},
+    {code:'549', name:'ÖZEL FONLAR', side:'A'},
+    {code:'570', name:'GEÇMİŞ YILLAR KARLARI', side:'A'},
+    {code:'580', name:'GEÇMİŞ YILLAR ZARARLARI (-)', side:'B'},
+    {code:'590', name:'DÖNEM NET KARI', side:'A'},
+    {code:'591', name:'DÖNEM NET ZARARI (-)', side:'B'},
+    {code:'600', name:'YURTİÇİ SATIŞLAR', side:'A'},
+    {code:'601', name:'YURTDIŞI SATIŞLAR', side:'A'},
+    {code:'602', name:'DİĞER GELİRLER', side:'A'},
+    {code:'610', name:'SATIŞTAN İADELER (-)', side:'B'},
+    {code:'611', name:'SATIŞ İSKONTOLARI (-)', side:'B'},
+    {code:'612', name:'DİĞER İNDİRİMLER (-)', side:'B'},
+    {code:'620', name:'SATILAN MAMULLER MALİYETİ (-)', side:'B'},
+    {code:'621', name:'SATILAN TİCARİ MALLAR MALİYETİ (-)', side:'B'},
+    {code:'622', name:'SATILAN HİZMET MALİYETİ (-)', side:'B'},
+    {code:'623', name:'DİĞER SATIŞLARIN MALİYETİ (-)', side:'B'},
+    {code:'630', name:'ARAŞTIRMA VE GELİŞTİRME GİDERLERİ (-)', side:'B'},
+    {code:'631', name:'PAZARLAMA, SATIŞ VE DAĞITIM GİDERLERİ(-)', side:'B'},
+    {code:'632', name:'GENEL YÖNETİM GİDERLERİ (-)', side:'B'},
+    {code:'640', name:'İŞTİRAKLERDEN TEMETTÜ GELİRLERİ', side:'A'},
+    {code:'641', name:'BAĞLI ORTAKLIKLARDAN TEMETTÜ GELİRLERİ', side:'A'},
+    {code:'642', name:'FAİZ GELİRLERİ', side:'A'},
+    {code:'643', name:'KOMİSYON GELİRLERİ', side:'A'},
+    {code:'644', name:'KONUSU KALMAYAN KARŞILIKLAR', side:'A'},
+    {code:'645', name:'MENKUL KIYMET SATIŞ KARLARI', side:'A'},
+    {code:'646', name:'KAMBİYO KARLARI', side:'A'},
+    {code:'647', name:'REESKONT FAİZ GELİRLERİ', side:'A'},
+    {code:'649', name:'DİĞER OLAĞAN GELİR VE KARLAR', side:'A'},
+    {code:'653', name:'KOMİSYON GİDERLERİ (-)', side:'B'},
+    {code:'654', name:'KARŞILIK GİDERLERİ (-)', side:'B'},
+    {code:'655', name:'MENKUL KIYMET SATIŞ ZARARLARI (-)', side:'B'},
+    {code:'656', name:'KAMBİYO ZARARLARI (-)', side:'B'},
+    {code:'657', name:'REESKONT FAİZ GİDERLERİ (-)', side:'B'},
+    {code:'659', name:'DİĞER OLAĞAN GİDER VE ZARARLAR (-)', side:'B'},
+    {code:'660', name:'KISA VADELİ BORÇLANMA GİDERLERİ (-)', side:'B'},
+    {code:'661', name:'UZUN VADELİ BORÇLANMA GİDERLERİ (-)', side:'B'},
+    {code:'671', name:'ÖNCEKİ DÖNEM GELİR VE KARLARI', side:'A'},
+    {code:'679', name:'DİĞER OLAĞANDIŞI GELİR VE KARLAR', side:'A'},
+    {code:'680', name:'ÇALIŞMAYAN KISIM GİDER VE ZARARLARI (-)', side:'B'},
+    {code:'681', name:'ÖNCEKİ DÖNEM GİDER VE ZARARLARI (-)', side:'B'},
+    {code:'689', name:'DİĞER OLAĞANDIŞI GİDER VE ZARARLAR (-)', side:'B'},
+    {code:'690', name:'DÖNEM KARI VEYA ZARARI', side:'A'},
+    {code:'691', name:'DÖNEM KARI VERGİ VE DİĞ.YAS.YÜK.KAR. (-)', side:'B'},
+    {code:'692', name:'DÖNEM NET KARI VEYA ZARARI', side:'A'},
+    {code:'700', name:'MALİYET MUHASEBESİ BAĞLANTI HESABI', side:'B'},
+    {code:'701', name:'MALİYET MUHASEBESİ YANSITMA HESABI', side:'B'},
+    {code:'710', name:'DİREKT İLK MADDE VE MALZEME GİDERLERİ', side:'B'},
+    {code:'711', name:'DİREKT İLK MADDE VE MALZEME GİD.YAN.HES.', side:'A'},
+    {code:'712', name:'DİREKT İLK MADDE VE MALZEME FİYAT FARKI', side:'B'},
+    {code:'713', name:'DİREKT İLK MADDE VE MALZEME MİKTAR FARKI', side:'B'},
+    {code:'720', name:'DİREKT İŞÇİLİK GİDERLERİ', side:'B'},
+    {code:'721', name:'DİREKT İŞÇİLİK GİDERLERİ YANSITMA HESABI', side:'A'},
+    {code:'722', name:'DİREKT İŞÇİLİK ÜCRET FARKLARI', side:'B'},
+    {code:'723', name:'DİREKT İŞÇİLİK SÜRE (ZAMAN) FARKLARI', side:'B'},
+    {code:'730', name:'GENEL ÜRETİM GİDERLERİ', side:'B'},
+    {code:'731', name:'GENEL ÜRETİM GİDERLERİ YANSITMA HESABI', side:'A'},
+    {code:'732', name:'GENEL ÜRETİM GİDERLERİ BÜTÇE FARKLARI', side:'B'},
+    {code:'733', name:'GENEL ÜRETİM GİDERLERİ VERİMLİLİK FARK.', side:'B'},
+    {code:'734', name:'GENEL ÜRETİM GİDERLERİ KAPASİTE FARKLARI', side:'B'},
+    {code:'740', name:'HİZMET ÜRETİM MALİYETİ', side:'B'},
+    {code:'741', name:'HİZMET ÜRETİM MALİYETİ YANSITMA HESABI', side:'A'},
+    {code:'742', name:'HİZMET ÜRETİM MALİYETİ FARK HESAPLARI', side:'B'},
+    {code:'750', name:'ARAŞTIRMA VE GELİŞTİRME GİDERLERİ', side:'B'},
+    {code:'751', name:'ARAŞTIRMA VE GELİŞTİRME GİD. YANSITMA H.', side:'A'},
+    {code:'752', name:'ARAŞTIRMA VE GELİŞTİRME GİDER FARKLARI', side:'B'},
+    {code:'760', name:'PAZARLAMA, SATIŞ VE DAĞITIM GİDERLERİ', side:'B'},
+    {code:'761', name:'PAZARLAMA, SATIŞ VE DAĞITIM GİD.YAN.HES.', side:'A'},
+    {code:'762', name:'PAZARLAMA, SATIŞ VE DAĞITIM GİD.FARK HES', side:'B'},
+    {code:'770', name:'GENEL YÖNETİM GİDERLERİ', side:'B'},
+    {code:'771', name:'GENEL YÖNETİM GİDERLERİ YANSITMA HESABI', side:'A'},
+    {code:'772', name:'GENEL YÖNETİM GİDER FARKLARI HESABI', side:'B'},
+    {code:'780', name:'FİNANSMAN GİDERLERİ', side:'B'},
+    {code:'781', name:'FİNANSMAN GİDERLERİ YANSITMA HESABI', side:'A'},
+    {code:'782', name:'FİNANSMAN GİDERLERİ FARK HESABI', side:'B'},
+    {code:'790', name:'İLK MADDE VE MALZEME GİDERLERİ', side:'B'},
+    {code:'791', name:'İŞÇİ ÜCRET VE GİDERLERİ', side:'B'},
+    {code:'792', name:'MEMUR ÜCRET VE GİDERLERİ', side:'B'},
+    {code:'793', name:'DIŞARIDAN SAĞLANAN FAYDA VE HİZMETLER', side:'B'},
+    {code:'794', name:'ÇEŞİTLİ GİDERLER', side:'B'},
+    {code:'795', name:'VERGİ RESİM VE HARÇLAR', side:'B'},
+    {code:'796', name:'AMORTİSMANLAR VE TÜKENME PAYLARI', side:'B'},
+    {code:'797', name:'FİNANSMAN GİDERLERİ', side:'B'},
+    {code:'798', name:'GİDER ÇEŞİTLERİ YANSITMA HESABI', side:'A'},
+    {code:'799', name:'ÜRETİM MALİYET HESABI', side:'B'},
+    {code:'900', name:'TEMİNAT MEKTUBUNDAN ALACAKLAR', side:'B'},
+    {code:'901', name:'TEMİNAT MEKTUBUNDAN BORÇLAR', side:'A'},
+    {code:'910', name:'ALINAN YATIRIM İNDİRİMLERİ', side:'B'},
+    {code:'911', name:'ALINAN YATIRIM İNDİRİMLERİ KARŞILIĞI', side:'A'},
+    {code:'920', name:'YATIRIM İNDİRİMİ KULLANILANLAR KARŞILIĞI', side:'B'},
+    {code:'921', name:'YATIRIM İNDİRİMİNDEN KULLANILAN', side:'A'},
+    {code:'930', name:'TEMİNAT ALINAN KIYMETLER', side:'B'},
+    {code:'931', name:'TEMİNAT KIYMET VERENLER', side:'A'},
+    {code:'940', name:'EMANET ALINAN KIYMETLER', side:'B'},
+    {code:'941', name:'EMANET KIYMET VERENLER', side:'A'},
+    {code:'950', name:'KANUNEN KABUL EDİLMEYEN GİDERLER', side:'B'},
+    {code:'951', name:'KANUNEN KABUL EDİLMEYEN GİDERLER KARŞI.', side:'A'},
+    {code:'960', name:'DİĞER İNDİRİMLER', side:'B'},
+    {code:'961', name:'DİĞER İNDİRİMLER KARŞILIĞI', side:'A'}
+  ];
+
+
+  const STORE_KEY = 'bmuhasebe_v2_vouchers_only';
+  let DB = { vouchers: [] }; // {date,no,desc,lines:[{account,debit,credit,desc}]}
+
+  // ---------- Yardımcılar ----------
+  function fmt(n){
+    return (Number(n)||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+
+  function fmtNoZero(n){
+    const num = Number(n)||0;
+    return num === 0 ? '' : fmt(num);
+  }
+
+  function toNum(v){
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+
+    // NBSP ve her türlü boşluğu temizle
+    let s = String(v).trim().replace(/\u00A0/g,' ').replace(/\s+/g,'');
+
+    const hasComma = s.includes(','), hasDot = s.includes('.');
+    const dotCount = (s.match(/\./g) || []).length;
+
+    if (hasComma && hasDot){
+      const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+      s = lastComma > lastDot ? s.replace(/\./g,'').replace(',', '.') : s.replace(/,/g,'');
+      const n = parseFloat(s); return isNaN(n) ? 0 : n;
+    }
+    if (hasComma){ s = s.replace(/\./g,'').replace(',', '.'); const n=parseFloat(s); return isNaN(n)?0:n; }
+    if (hasDot){
+      if (dotCount>1){ s=s.replace(/\./g,''); const n=parseFloat(s); return isNaN(n)?0:n; }
+      const parts=s.split('.'); if((parts[1]??'').length===3){ s=s.replace(/\./g,''); }
+      const n=parseFloat(s); return isNaN(n)?0:n;
+    }
+    const n=Number(s); return isNaN(n)?0:n;
+  }
+
+  function ymd(d){
+    if(!d) return '';
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const t = (d instanceof Date) ? d : new Date(d);
+    const y = t.getFullYear();
+    const m = String(t.getMonth()+1).padStart(2,'0');
+    const dd= String(t.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  }
+  function parseDateInput(v){ if(!v) return null; const p=v.split('-'); if(p.length!==3) return null; return new Date(+p[0],+p[1]-1,+p[2]); }
+  function dmyFromISO(iso){ const s=ymd(iso); const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m?`${m[3]}.${m[2]}.${m[1]}`:''; }
+  function isoFromDMY(s){ if(!s)return''; const m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(s).trim()); if(!m)return''; return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`; }
+  
+  function getAccName(code){
+    return ACCOUNTS.find(a=>a.code===code)?.name || '';
+  }
+
+  function loadDB(){
+    try{
+      const s=localStorage.getItem(STORE_KEY);
+      if(s){
+        const data=JSON.parse(s)||{};
+        if(Array.isArray(data.vouchers)) DB.vouchers = data.vouchers;
+      }
+    }catch(e){}
+  }
+  function saveDB(){ localStorage.setItem(STORE_KEY, JSON.stringify({vouchers: DB.vouchers})); }
+
+  // ------- Para girişi: canlı biçim (kuruş girişi için virgül desteği) -------
+  function attachMoneyMask(el, peerToClear){
+    
+    function getCaretPosition(input) {
+      if (!input) return 0;
+      if (input.selectionStart !== undefined) {
+        return input.selectionStart;
+      }
+      return 0;
+    }
+
+    function setCaretPosition(input, pos) {
+      if (!input) return;
+      if (input.setSelectionRange) {
+        input.focus();
+        input.setSelectionRange(pos, pos);
+      }
+    }
+
+    el.addEventListener('focus', (e)=>{
+      setTimeout(()=>{ 
+        if(el.select) el.select(); 
+      }, 0);
+    });
+
+    el.addEventListener('input', (e)=>{
+      let raw = e.target.value;
+      const caret = getCaretPosition(e.target);
+      
+      // Sadece rakam, virgül ve noktaya izin ver
+      let val = raw.replace(/[^\d,.]/g, '');
+      
+      // Birden fazla virgül veya nokta varsa sadece birini koru
+      let commaCount = (val.match(/,/g) || []).length;
+      let dotCount = (val.match(/\./g) || []).length;
+      
+      if (commaCount > 1) {
+        // İlk virgülü koru, diğerlerini sil
+        val = val.replace(/,/g, '');
+        const firstCommaIndex = raw.indexOf(',');
+        if (firstCommaIndex >= 0) {
+          val = val.substring(0, firstCommaIndex) + ',' + val.substring(firstCommaIndex);
+        }
+      }
+      
+      if (dotCount > 1) {
+        // İlk noktayı koru, diğerlerini sil
+        val = val.replace(/\./g, '');
+        const firstDotIndex = raw.indexOf('.');
+        if (firstDotIndex >= 0) {
+          val = val.substring(0, firstDotIndex) + '.' + val.substring(firstDotIndex);
+        }
+      }
+      
+      // Virgül ve nokta birlikte varsa, sadece birini koru (son giren)
+      if (val.includes(',') && val.includes('.')) {
+        const lastCommaIndex = val.lastIndexOf(',');
+        const lastDotIndex = val.lastIndexOf('.');
+        
+        if (lastCommaIndex > lastDotIndex) {
+          val = val.replace(/\./g, '');
+        } else {
+          val = val.replace(/,/g, '');
+        }
+      }
+      
+      e.target.value = val;
+      
+      // İmleç konumunu ayarla
+      setCaretPosition(e.target, caret);
+      
+      if (peerToClear && toNum(val) > 0) peerToClear.value = '';
+
+      recalcVoucherTotals();
+      markDirty();
+    });
+
+    el.addEventListener('blur', (e)=>{
+      if (el.value.trim() !== '') {
+        // Formatla: bindelik ayraçları ekle
+        const num = toNum(el.value);
+        el.value = fmt(num);
+      }
+    });
+
+    // Klavye girişini dinle - virgül ve nokta için özel işleme
+    el.addEventListener('keydown', (e)=>{
+      if (e.key === ',' || e.key === '.') {
+        // Virgül veya nokta girildiğinde, zaten varsa engelle
+        if (el.value.includes(',') || el.value.includes('.')) {
+          e.preventDefault();
+        }
+      }
+    });
+  }
+
+  // ---------- Fiş Girişi ----------
+  function makeAccSelect(){
+    const sel=document.createElement('select');
+    const e=document.createElement('option'); e.value=''; e.textContent='(Seçiniz)'; sel.appendChild(e);
+    // LISTE: "100.KASA", "120.ALICILAR" biçimi (SIRALAMA METİN OLARAK BIRAKILDI)
+    ACCOUNTS.slice().sort((a,b)=>a.code.localeCompare(b.code)).forEach(a=>{
+      const o=document.createElement('option');
+      o.value=a.code;
+      o.textContent=`${a.code}.${a.name}`; // nokta ile gösterim
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', ()=>{
+      LAST_USED_ACCOUNT = sel.value || LAST_USED_ACCOUNT;
+      markDirty();
+    });
+    sel.addEventListener('focus', ()=>{
+      if (sel.value) LAST_USED_ACCOUNT = sel.value;
+    });
+    return sel;
+  }
+
+  function addVoucherRow(pref = {}, afterTr = null){
+  const tb = document.querySelector('#voucherTable tbody');
+  const tr = document.createElement('tr');
+
+  // --- 1. Hesap seçimi ---
+  const tdAcc = document.createElement('td');
+  const sel = makeAccSelect();
+  sel.value = pref.account || pref.hesapKodu || '';
+  tdAcc.appendChild(sel);
+
+  // --- 2. Borç ---
+  const tdDr = document.createElement('td');
+  const dr = document.createElement('input');
+  dr.type = 'text'; dr.className = 'right'; dr.setAttribute('inputmode','decimal');
+  dr.value = (pref.debit ?? pref.borc) ? fmt(toNum(pref.debit ?? pref.borc)) : '';
+  tdDr.appendChild(dr);
+
+  // --- 3. Alacak ---
+  const tdCr = document.createElement('td');
+  const cr = document.createElement('input');
+  cr.type = 'text'; cr.className = 'right'; cr.setAttribute('inputmode','decimal');
+  cr.value = (pref.credit ?? pref.alacak) ? fmt(toNum(pref.credit ?? pref.alacak)) : '';
+  tdCr.appendChild(cr);
+
+  // --- 4. Açıklama ---
+  const tdDc = document.createElement('td');
+  const dc = document.createElement('input');
+  dc.type = 'text'; dc.placeholder = 'Açıklama';
+  dc.value = pref.desc ?? pref.aciklama ?? '';
+  dc.maxLength = 50;
+  tdDc.appendChild(dc);
+
+  // --- 5. Kopyala ---
+  const tdCopy = document.createElement('td');
+  const btnCopy = document.createElement('button');
+  btnCopy.textContent = 'Kopyala';
+  btnCopy.title = 'Bu satırı kopyala';
+  btnCopy.addEventListener('click', ()=>{
+    const acc = sel.value || '';
+    const dv  = toNum(dr.value);
+    const cv  = toNum(cr.value);
+    const dsc = dc.value || '';
+    const last = addVoucherRow(
+      { account: acc, debit: dv ? dv : '', credit: cv ? cv : '', desc: dsc },
+      tr // altına ekle
+    );
+    const target = dv ? last.children[1].querySelector('input')
+                      : cv ? last.children[2].querySelector('input')
+                           : last.querySelector('select');
+    target?.focus(); target?.select?.();
+    markDirty(); recalcVoucherTotals();
+  });
+  tdCopy.appendChild(btnCopy);
+
+  // --- 6. Sil ---
+  const tdDel = document.createElement('td');
+  const del = document.createElement('button');
+  del.textContent = 'Sil';
+  del.title = 'Satırı Sil';
+  del.onclick = ()=>{ tr.remove(); recalcVoucherTotals(); markDirty(); };
+  tdDel.appendChild(del);
+
+  // --- 7. Ekle (+ Satır)  [YENİ HÜCRE] ---
+  const tdAdd = document.createElement('td');
+  const btnAdd = document.createElement('button');
+  btnAdd.textContent = '+ Satır';
+  btnAdd.title = 'Bu satırın altına yeni satır ekle';
+  btnAdd.addEventListener('click', ()=>{
+    const newTr = addVoucherRow({}, tr); // bu satırın altına
+    const target = newTr.querySelector('select');
+    target?.focus();
+    markDirty(); recalcVoucherTotals();
+  });
+  tdAdd.appendChild(btnAdd);
+
+  // --- Satırı tabloya yerleştir ---
+  tr.appendChild(tdAcc);
+  tr.appendChild(tdDr);
+  tr.appendChild(tdCr);
+  tr.appendChild(tdDc);
+  tr.appendChild(tdCopy);
+  tr.appendChild(tdDel);
+  tr.appendChild(tdAdd);     // <— YENİ sütun
+
+  if (afterTr && afterTr.parentNode === tb){
+    tb.insertBefore(tr, afterTr.nextSibling);
+  } else {
+    tb.appendChild(tr);
+  }
+
+  // Maske ve tek-taraf kuralı
+  attachMoneyMask(dr, cr);
+  attachMoneyMask(cr, dr);
+
+  // Odak takibi / dirty
+  [sel, dr, cr, dc].forEach(el=>{
+    el.addEventListener('focus', ()=>{ CURRENT_VOUCHER_ROW = tr; });
+  });
+  sel.addEventListener('change', markDirty);
+  dc.addEventListener('input', markDirty);
+
+  recalcVoucherTotals();
+  return tr;
+}
+
+  function collectVoucher(){
+    const date=document.getElementById('v_tarih').value;
+    const no=document.getElementById('v_fisno').value.trim();
+    const rows=document.querySelectorAll('#voucherTable tbody tr');
+    const lines=[];
+    rows.forEach(r=>{
+      const account=r.children[0].querySelector('select').value;
+      const debit=toNum(r.children[1].querySelector('input').value);
+      const credit=toNum(r.children[2].querySelector('input').value);
+      const desc = r.children[3].querySelector('input')?.value || '';
+      if (account && ((debit>0) !== (credit>0))) lines.push({account,debit,credit,desc});
+    });
+    const vdesc = document.getElementById('v_desc').value.trim();
+    return {date, no, desc:vdesc, lines};
+  }
+
+  function recalcVoucherTotals(){
+    const rows=document.querySelectorAll('#voucherTable tbody tr');
+    let td=0, tc=0, active=0;
+    rows.forEach(r=>{
+      const dv=toNum(r.children[1].querySelector('input').value);
+      const cv=toNum(r.children[2].querySelector('input').value);
+      td+=dv; tc+=cv; if (dv>0 || cv>0) active++;
+    });
+    document.getElementById('v_tdb').textContent=fmt(td);
+    document.getElementById('v_tcr').textContent=fmt(tc);
+    const ok = active>=2 && Math.abs(td-tc)<0.005 && td>0 && tc>0;
+    const btn=document.getElementById('v_save');
+    btn.disabled = READONLY_MODE || !ok;
+    btn.title= ok? '' : 'Fiş en az 2 dolu satır içermeli ve Toplam Borç = Toplam Alacak olmalı';
+  }
+
+  // ---------- Düzenleme modu (Pasif/Aktif) ----------
+function setVoucherEditable(isEditable){
+  READONLY_MODE = !isEditable;
+
+  // Fiş alanı fieldset'ini pasifken işaretle
+  const fisFieldset = document.querySelector('legend')?.textContent?.includes('Yeni Fiş')
+    ? document.querySelector('legend').closest('fieldset') : null;
+  if (fisFieldset) fisFieldset.classList.toggle('readonly', !isEditable);
+
+  // Üst alanlar (tarih ve fiş açıklaması) - fiş no zaten readonly
+  document.getElementById('v_tarih').disabled = !isEditable;
+  document.getElementById('v_desc').disabled  = !isEditable;
+
+  // Tablo içi tüm giriş ve butonlar
+  document.querySelectorAll('#voucherTable select, #voucherTable input, #voucherTable button').forEach(el=>{
+    el.disabled = !isEditable;
+  });
+
+  // Düzenlemeye etki eden araçlar
+  ['v_balance','v_delete','btnPurchaseInv','btnSalesInv'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.disabled = !isEditable;
+  });
+
+  // "Yeni", "Yükle", "Önceki", "Sonraki" her zaman aktif kalsın
+  // "Fişi Güncelle" butonu sadece pasifken aktif olsun
+  const editBtn = document.getElementById('v_edit');
+  if (editBtn) editBtn.disabled = isEditable;
+
+  // Kaydet butonu: denge şartı + pasiflik birlikte değerlensin
+  recalcVoucherTotals(); // recalc içinde READONLY_MODE kontrolü var (bir sonraki adımda ekleyeceğiz)
+}
+
+
+  function nextVoucherNo(){
+    const nums=DB.vouchers.map(v=>parseInt(String(v.no).replace(/[^0-9]/g,''),10)).filter(n=>!isNaN(n));
+    const next=(nums.length? Math.max(...nums)+1 : 1);
+    return String(next);
+  }
+
+  function newVoucher(){
+    document.getElementById('v_tarih').value = ymd(new Date());
+    document.getElementById('v_fisno').value = nextVoucherNo();
+    document.getElementById('v_desc').value = '';
+    document.querySelector('#voucherTable tbody').innerHTML='';
+    addVoucherRow(); addVoucherRow();
+    recalcVoucherTotals();
+    setVoucherEditable(true); // boş yeni fiş düzenlenebilir olsun
+
+    FORM_DIRTY = false;
+    setSavedMessage(false);
+  }
+
+  function upsertVoucher(v){
+    if(!v.date) throw new Error('Tarih zorunudur.');
+    if(!v.no)   throw new Error('Fiş No boş olamaz.');
+    if(!Array.isArray(v.lines)||v.lines.length<2) throw new Error('Bir fiş en az 2 satırdan oluşmalıdır.');
+
+    let td=0, tc=0;
+    v.lines.forEach((ln,i)=>{
+      if(!ln.account) throw new Error(`Satır ${i+1}: Hesap Kodu zorunlu.`);
+      if((ln.debit>0 && ln.credit>0) || (ln.debit===0 && ln.credit===0)) throw new Error(`Satır ${i+1}: Borç/Alacak tek taraflı olmalı.`);
+      td+=toNum(ln.debit); tc+=toNum(ln.credit);
+    });
+    if(Math.abs(td-tc)>0.005) throw new Error('Fiş dengede değil.');
+
+    const keyNo   = String(v.no);
+    const keyDate = ymd(v.date);
+    const i = DB.vouchers.findIndex(x=>String(x.no)===keyNo && ymd(x.date)===keyDate);
+    if(i>=0) DB.vouchers[i]=v; else DB.vouchers.push(v);
+    saveDB();
+  }
+
+  function saveVoucher(){
+  // PASİF KORUMA: pasif fişte kaydetme
+  if (READONLY_MODE){
+    alert('Bu fiş pasif. Değişiklik yapmak için "Fişi Güncelle" düğmesine tıklayın.');
+    return;
+  }
+
+  const msg = document.getElementById('v_msg');
+  msg.textContent = 'Kaydediliyor...';
+
+  try{
+    const v = collectVoucher();
+    upsertVoucher(v);
+
+    FORM_DIRTY = false;
+    setSavedMessage(true);
+    refreshVoucherList();
+    renderMizan();
+
+    // "Kaydedildi" göründükten 3 sn sonra yeni fişe geç
+    setTimeout(() => {
+      document.getElementById('v_new').click();
+    }, 3000);
+
+  }catch(e){
+    msg.textContent = 'Hata: ' + e.message;
+  }
+}
+
+
+function deleteVoucher(){
+  // PASİF KORUMA: pasif fişte silmeyi engelle
+  if (READONLY_MODE){
+    alert('Bu fiş pasif. Silmeden önce "Fişi Güncelle" ile düzenlemeyi açın.');
+    return;
+  }
+
+  const sel = document.getElementById('v_select');
+  let no = '';
+  let dSel = '';
+  if(sel && sel.value){
+    const p = sel.value.split('|');
+    dSel = p[0]; no = p[1];
+  }
+  if(!no){
+    no = document.getElementById('v_fisno').value.trim();
+    dSel = document.getElementById('v_tarih').value.trim();
+  }
+  if(!no){ alert('Silinecek fiş seçilmedi.'); return; }
+
+  if(!confirm(`Fiş No ${no} silinsin mi? Bu işlem geri alınamaz.`)) return;
+
+  let idx = -1;
+  if(dSel) idx = DB.vouchers.findIndex(x=>ymd(x.date)===ymd(dSel) && String(x.no)===String(no));
+  if(idx<0) idx = DB.vouchers.findIndex(x=>String(x.no)===String(no));
+  if(idx<0){ alert('Fiş bulunamadı.'); return; }
+
+  DB.vouchers.splice(idx,1);
+  saveDB();
+  refreshVoucherList();
+  newVoucher();
+  renderMizan();
+  alert(`Fiş ${no} silindi.`);
+}
+
+
+  // ---------- Fiş Liste / Yükle ----------
+  function refreshVoucherList(){
+    const sel = document.getElementById('v_select');
+    sel.innerHTML = '';
+
+    const list = [...DB.vouchers].sort((a,b)=>{
+      const da = ymd(a.date), db = ymd(b.date);
+      const byDate = db.localeCompare(da);
+      if(byDate!==0) return byDate;
+      const an = parseInt(String(a.no).replace(/[^0-9]/g,''),10) || 0;
+      const bn = parseInt(String(b.no).replace(/[^0-9]/g,''),10) || 0;
+      return bn - an;
+    });
+
+    list.forEach(v=>{
+      const opt = document.createElement('option');
+      opt.value = ymd(v.date) + '|' + v.no;
+      const td = v.lines.reduce((s,x)=>s+toNum(x.debit),0);
+      const tc = v.lines.reduce((s,x)=>s+toNum(x.credit),0);
+      opt.textContent = `${v.no} — ${dmyFromISO(v.date)}${v.desc ? ' — ' + v.desc : ''} (B:${fmt(td)} / A:${fmt(tc)})`;
+      sel.appendChild(opt);
+    });
+  }
+
+  function loadSelectedVoucher(){
+    const sel=document.getElementById('v_select'); if(!sel.value) return;
+    const [d,no]=sel.value.split('|');
+    const v=DB.vouchers.find(x=>ymd(x.date)===d && String(x.no)===no);
+    if(!v) return;
+    document.getElementById('v_tarih').value=ymd(v.date);
+    document.getElementById('v_fisno').value=v.no;
+    document.getElementById('v_desc').value = v.desc || '';
+    const tbody=document.querySelector('#voucherTable tbody'); tbody.innerHTML='';
+    (v.lines||[]).forEach(ln=> addVoucherRow({account:ln.account, debit:ln.debit, credit:ln.credit, desc:ln.desc}));
+    if((v.lines||[]).length===0){ addVoucherRow(); addVoucherRow(); }
+    recalcVoucherTotals();
+
+    FORM_DIRTY = false;
+    setSavedMessage(false);
+    setVoucherEditable(false); // Yüklenen geçmiş fiş pasif gelsin
+
+  }
+
+// --- Gezinme yardımcıları ---
+function currentVoucherKeyFromForm(){
+  const d = document.getElementById('v_tarih').value.trim();
+  const n = document.getElementById('v_fisno').value.trim();
+  if (!d || !n) return null;
+  return ymd(d) + '|' + String(n);
+}
+
+function ensureSelectMatchesCurrent(){
+  const sel = document.getElementById('v_select');
+  if (!sel) return false;
+  const key = currentVoucherKeyFromForm();
+  if (!key) return false;
+  const idx = Array.from(sel.options).findIndex(o => o.value === key);
+  if (idx >= 0) { sel.selectedIndex = idx; return true; }
+  return false;
+}
+
+// --- Gezinme yardımcıları ---
+// directionStr: 'prev' = önceki fiş (kronolojik olarak daha eski, listede AŞAĞI),
+//                'next' = sonraki fiş (kronolojik olarak daha yeni, listede YUKARI)
+function navigateVoucher(directionStr){
+  const sel = document.getElementById('v_select');
+  if (!sel || !sel.options.length){
+    alert('Gezinecek kayıt bulunamadı.');
+    return;
+  }
+
+  // Kaydedilmemiş değişiklik uyarısı
+  if (FORM_DIRTY){
+    const ok = confirm('Bu fişte kaydedilmemiş değişiklikler var. Yine de diğer fişe geçilsin mi?');
+    if (!ok) return;
+  }
+
+  // Eğer select boşsa, formdaki fişi seçmeye çalış
+  if (!sel.value){
+    if (!ensureSelectMatchesCurrent()){
+      // bulunamazsa, başlangıç konumunu belirle
+      sel.selectedIndex = (directionStr === 'next') ? 0 : (sel.options.length - 1);
+    }
+  }
+
+  // LİSTE SIRASI: en yeni en üstte
+  // Önceki (daha eski) -> index + 1
+  // Sonraki (daha yeni) -> index - 1
+  const step = (directionStr === 'prev') ? +1 : -1;
+
+  let idx = sel.selectedIndex + step;
+
+  // Sınır mesajları (doğru uçlar)
+  if (idx < 0){
+    alert('Zaten son fiştesiniz.');    // listenin en üstü = en yeni = "son fiş"
+    return;
+  }
+  if (idx >= sel.options.length){
+    alert('Zaten ilk fiştesiniz.');    // listenin en altı = en eski = "ilk fiş"
+    return;
+  }
+
+  sel.selectedIndex = idx;
+  loadSelectedVoucher();
+  setVoucherEditable(false);
+
+  // Seçimden sonra form & select senkron kalsın (opsiyonel ama faydalı)
+  ensureSelectMatchesCurrent();
+}
+
+
+// ---------- Mizan ----------
+function renderMizan(){
+  const from = parseDateInput(document.getElementById('mzFrom').value);
+  const to   = parseDateInput(document.getElementById('mzTo').value);
+
+  // code -> {name, expected, debit, credit}
+  const map = {};
+  ACCOUNTS.forEach(a=>{
+    map[a.code] = { name: a.name, expected: a.side || null, debit: 0, credit: 0 };
+  });
+
+  DB.vouchers.forEach(v=>{
+    const d = parseDateInput(ymd(v.date));
+    if (from && d < from) return;
+    if (to   && d > to)   return;
+
+    (v.lines || []).forEach(ln=>{
+      const code = ln.account;
+      if (!map[code]) map[code] = { name: getAccName(code), expected: null, debit: 0, credit: 0 };
+      map[code].debit  += toNum(ln.debit);
+      map[code].credit += toNum(ln.credit);
+    });
+  });
+
+  const rows = Object.keys(map).map(code => ({
+      code,
+      name     : map[code].name,
+      expected : map[code].expected,
+      debit    : map[code].debit,
+      credit   : map[code].credit
+    }))
+    .filter(r => r.debit !== 0 || r.credit !== 0)
+    .sort((a,b) => a.code.localeCompare(b.code)); // metin sırası
+
+  const tb = document.querySelector('#mizanTable tbody');
+  tb.innerHTML = '';
+
+  rows.forEach(r=>{
+    const diff  = r.debit - r.credit;
+    const side  = diff >= 0 ? 'B' : 'A';
+    const bal   = Math.abs(diff);
+    const mismatch = r.expected && r.expected !== side;
+    const note  = mismatch ? `hesap ters bakiye veriyor (Beklenen: ${r.expected})` : '';
+
+    const tr = document.createElement('tr');
+    if (mismatch) tr.classList.add('warn');
+
+    tr.innerHTML = `
+      <td>${escapeHTML(r.code)}</td>
+      <td>${escapeHTML(r.name)}</td>
+      <td class="right">${fmtNoZero(r.debit)}</td>
+      <td class="right">${fmtNoZero(r.credit)}</td>
+      <td class="right">${side === 'B' ? fmtNoZero(bal) : ''}</td>
+      <td class="right">${side === 'A' ? fmtNoZero(bal) : ''}</td>
+      <td>${side}</td>
+      <td>${escapeHTML(note)}</td>
+    `;
+    tb.appendChild(tr);
+  });
+
+  // Genel toplamlar
+  const t = rows.reduce((a,r)=>{ a.d += r.debit; a.c += r.credit; return a; }, {d:0,c:0});
+  document.getElementById('tDB').textContent = fmtNoZero(t.d);
+  document.getElementById('tCR').textContent = fmtNoZero(t.c);
+
+  // Bakiye toplamları (Borç/Alacak kolonlarının alt toplamları)
+  const bTot = rows.reduce((a,r)=>{
+    const diff = r.debit - r.credit;
+    if (diff >= 0) a.borc += diff; else a.alacak += -diff;
+    return a;
+  }, {borc:0, alacak:0});
+
+  document.getElementById('tBorcBakiye').textContent   = fmtNoZero(bTot.borc);
+  document.getElementById('tAlacakBakiye').textContent = fmtNoZero(bTot.alacak);
+}
+
+
+  // ---------- Rapor yardımcıları (yeni sekmede) ----------
+  function escapeHTML(s){ return String(s)
+   .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+   .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+  function openReportInNewTab(title, innerHTML){
+    const css = `
+  :root{ --text:#111; --muted:#6b7280; --line:#e5e7eb;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); margin:24px;}
+  h1{font-size:20px; margin:0 0 12px}
+  .meta{color:var(--muted); font-size:12px; margin-bottom:12px}
+  table{width:100%; border-collapse:collapse; margin-top:6px; table-layout: fixed;} /* <— fixed */
+  th,td{
+    border:1px solid var(--line);
+    padding:6px 8px;
+    font-size:13px;
+    text-align:left;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  th{background:#fafafa; font-weight:700}
+  td.right, th.right{text-align:right}
+  .toolbar{margin:8px 0 12px 0}
+  .toolbar button{padding:8px 10px; border:1px solid var(--line); border-radius:8px; cursor:pointer; background:white}
+  @media print {.toolbar{display:none}}
+  .voucher-separator td { border: none; height: 10px; border-bottom: 1px solid #ccc; }
+  .warn { background:#fff1f2; }
+  .warn td { color:#991b1b; }
+
+  /* "Açıklama" sütunu: başlık ve hücreler class="desc-col" */
+  th.desc-col, td.desc-col{
+    width:220px;           /* ihtiyacına göre 200–280px arası oynatabilirsin */
+    max-width:220px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+`;
+
+    const now = new Date();
+    const meta = `Oluşturma: ${ymd(now)} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHTML(title)}</title><style>${css}</style></head>
+    <body>
+      <div class="toolbar"><button onclick="window.print()">Yazdır</button></div>
+      <h1>${escapeHTML(title)}</h1>
+      <div class="meta">${escapeHTML(meta)}</div>
+      ${innerHTML}
+    </body></html>`;
+    const url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+    window.open(url, '_blank');
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }
+
+  function getReportRange(){
+    const from = parseDateInput(document.getElementById('rpFrom').value);
+    const to   = parseDateInput(document.getElementById('rpTo').value);
+    return {from, to};
+  }
+  function inRange(d, from, to){
+    if(from && d<from) return false;
+    if(to && d>to) return false;
+    return true;
+  }
+  function populateReportAccountSelect(){
+    const sel = document.getElementById('rpAccount');
+    sel.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = ''; opt0.textContent='(Seçiniz)';
+    sel.appendChild(opt0);
+    ACCOUNTS.slice().sort((a,b)=>a.code.localeCompare(b.code)).forEach(a=>{
+      const o=document.createElement('option');
+      o.value=a.code; o.textContent=`${a.code}.${a.name}`;
+      sel.appendChild(o);
+    });
+  }
+
+  // ---------- Raporlar ----------
+  function makeJournalReportHTML(){
+    const {from,to} = getReportRange();
+    const sortedVouchers = [...DB.vouchers].sort((a,b)=> Number(a.no) - Number(b.no) || ymd(a.date).localeCompare(ymd(b.date)));
+
+    let allRows = '';
+    let totalDebit = 0;
+    let totalCredit = 0;
+    let lastVoucherNo = null;
+
+    for (const v of sortedVouchers) {
+        const vd = parseDateInput(ymd(v.date));
+        if(!inRange(vd, from, to)) continue;
+
+        // Fiş numarası değiştiğinde ayırıcı ekle
+        if (lastVoucherNo !== null && v.no !== lastVoucherNo) {
+            allRows += `<tr class="voucher-separator"><td colspan="7"></td></tr>`;
+        }
+
+        (v.lines||[]).forEach(ln=>{
+            const accName = getAccName(ln.account);
+            const fullAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
+            allRows += `<tr>
+                <td>${escapeHTML(String(v.no))}</td>
+                <td>${escapeHTML(dmyFromISO(v.date))}</td>
+                <td class="desc-col">${escapeHTML(v.desc)}</td>
+                <td>${fullAcc}</td>
+                <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
+                <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
+                <td class="desc-col">${escapeHTML(ln.desc)}</td>
+            </tr>`;
+            totalDebit += toNum(ln.debit);
+            totalCredit += toNum(ln.credit);
+        });
+
+        lastVoucherNo = v.no;
+    }
+
+    return `
+      <table>
+        <thead>
+          <tr>
+            <th style="width:70px">Fiş No</th>
+            <th style="width:90px">Tarih</th>
+            <th class="desc-col">Fiş Açıklaması</th>
+            <th style="width:120px">Hesap Kodu & Adı</th>
+            <th class="right" style="width:110px">Borç</th>
+            <th class="right" style="width:110px">Alacak</th>
+            <th class="desc-col">Açıklama</th>
+          </tr>
+        </thead>
+        <tbody>${allRows || '<tr><td colspan="7">Kayıt bulunamadı.</td></tr>'}</tbody>
+        <tfoot>
+          <tr>
+            <th colspan="4" class="right">GENEL TOPLAM</th>
+            <th class="right">${fmtNoZero(totalDebit)}</th>
+            <th class="right">${fmtNoZero(totalCredit)}</th>
+            <th></th>
+          </tr>
+        </tfoot>
+      </table>`;
+}
+
+  function makeLedgerReportHTML(accountCode){
+    if(!accountCode) return `<p>Lütfen hesap seçin.</p>`;
+    const accMeta = ACCOUNTS.find(a=>a.code===accountCode) || {name:''};
+    const {from,to} = getReportRange();
+    const items = [];
+    DB.vouchers.forEach(v=>{
+      const vd = parseDateInput(ymd(v.date));
+      if(!inRange(vd, from, to)) return;
+      (v.lines||[]).forEach(ln=>{
+        if(String(ln.account)===accountCode){
+          items.push({
+            tarih:dmyFromISO(v.date), isoDate: ymd(v.date), no:String(v.no||''), acik: ln.desc||v.desc||'',
+            borc: toNum(ln.debit), alacak: toNum(ln.credit)
+          });
+        }
+      });
+    });
+    // Fiş numarasına göre sırala
+    items.sort((a,b)=>Number(a.no) - Number(b.no) || a.isoDate.localeCompare(b.isoDate));
+    
+    let balance = 0; // borç (+), alacak (-)
+    const trs = items.map(it=>{
+      balance += it.borc;
+      balance -= it.alacak;
+      const side = balance>=0 ? 'B' : 'A';
+      const balAbs = Math.abs(balance);
+      return `<tr>
+        <td>${escapeHTML(it.tarih)}</td>
+        <td>${escapeHTML(it.no)}</td>
+        <td class="desc-col">${escapeHTML(it.acik)}</td>
+        <td class="right">${fmtNoZero(it.borc)}</td>
+        <td class="right">${fmtNoZero(it.alacak)}</td>
+        <td class="right">${fmtNoZero(balAbs)}</td>
+        <td>${side}</td>
+      </tr>`;
+    }).join('');
+    const totals = items.reduce((s,r)=>{s.d+=r.borc; s.c+=r.alacak; return s;}, {d:0,c:0});
+    const sideEnd = balance>=0 ? 'B' : 'A';
+    return `
+      <div><b>Hesap:</b> ${escapeHTML(accountCode + ' ' + (accMeta.name||''))}</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:100px">Tarih</th>
+            <th style="width:60px">Fiş No</th>
+            <th class="desc-col">Açıklama</th>
+            <th style="width:100px" class="right">Borç</th>
+            <th style="width:100px" class="right">Alacak</th>
+            <th style="width:120px" class="right">İşleyen Bakiye</th>
+            <th style="width:50px">Taraf</th>
+          </tr>
+      </thead>
+        <tbody>${trs || '<tr><td colspan="7">Hareket bulunamadı.</td></tr>'}</tbody>
+        <tfoot>
+          <tr>
+            <th colspan="3" class="right">TOPLAM</th>
+            <th class="right">${fmtNoZero(totals.d)}</th>
+            <th class="right">${fmtNoZero(totals.c)}</th>
+            <th class="right">${fmtNoZero(Math.abs(balance))}</th>
+            <th>${sideEnd}</th>
+          </tr>
+        </tfoot>
+      </table>`;
+  }
+
+  function makeTrialReportHTML(){
+  const {from,to} = getReportRange();
+
+  // Hesap bazında topla
+  const map = {};
+  ACCOUNTS.forEach(a=>{
+    map[a.code] = { name: a.name, expected: a.side || null, debit: 0, credit: 0 };
+  });
+
+  DB.vouchers.forEach(v=>{
+    const d = parseDateInput(ymd(v.date));
+    if (!inRange(d, from, to)) return;
+    (v.lines || []).forEach(ln=>{
+      const code = ln.account;
+      if (!map[code]) map[code] = { name: getAccName(code), expected: null, debit: 0, credit: 0 };
+      map[code].debit  += toNum(ln.debit);
+      map[code].credit += toNum(ln.credit);
+    });
+  });
+
+  const rows = Object.keys(map).map(code=>({
+    code,
+    name     : map[code].name,
+    expected : map[code].expected,
+    debit    : map[code].debit,
+    credit   : map[code].credit
+  }))
+  .filter(r => r.debit !== 0 || r.credit !== 0)
+  .sort((a,b)=> a.code.localeCompare(b.code));
+
+  // Satırlar
+  const trs = rows.map(r=>{
+    const diff  = r.debit - r.credit;
+    const side  = diff >= 0 ? 'B' : 'A';
+    const bal   = Math.abs(diff);
+    const mismatch = r.expected && r.expected !== side;
+    const note  = mismatch ? `hesap ters bakiye veriyor (Beklenen: ${r.expected})` : '';
+
+    return `<tr class="${mismatch ? 'warn' : ''}">
+      <td>${escapeHTML(r.code)}</td>
+      <td>${escapeHTML(r.name)}</td>
+      <td class="right">${fmtNoZero(r.debit)}</td>
+      <td class="right">${fmtNoZero(r.credit)}</td>
+      <td class="right">${side==='B' ? fmtNoZero(bal) : ''}</td>
+      <td class="right">${side==='A' ? fmtNoZero(bal) : ''}</td>
+      <td>${side}</td>
+      <td>${escapeHTML(note)}</td>
+    </tr>`;
+  }).join('');
+
+  // Toplamlar
+  const t = rows.reduce((a,r)=>{ a.d += r.debit; a.c += r.credit; return a; }, {d:0, c:0});
+  const bTot = rows.reduce((a,r)=>{
+    const diff = r.debit - r.credit;
+    if (diff >= 0) a.borc += diff; else a.alacak += -diff;
+    return a;
+  }, {borc:0, alacak:0});
+
+  // Rapor tablosu
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th style="width:130px">Hesap Kodu</th>
+          <th>Adı</th>
+          <th class="right">Toplam Borç</th>
+          <th class="right">Toplam Alacak</th>
+          <th class="right">Borç Bakiye</th>
+          <th class="right">Alacak Bakiye</th>
+          <th style="width:60px">Taraf</th>
+          <th>Not</th>
+        </tr>
+      </thead>
+      <tbody>${trs || '<tr><td colspan="8">Kayıt bulunamadı.</td></tr>'}</tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2" class="right">GENEL TOPLAM</th>
+          <th class="right">${fmtNoZero(t.d)}</th>
+          <th class="right">${fmtNoZero(t.c)}</th>
+          <th class="right">${fmtNoZero(bTot.borc)}</th>
+          <th class="right">${fmtNoZero(bTot.alacak)}</th>
+          <th colspan="2"></th>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
+
+  function makeVoucherPrintHTML(){
+    const sel=document.getElementById('v_select');
+    if(!sel || !sel.value) return '<p>Lütfen üstte "Kayıtlı Fişler"den bir fiş seçip "Yükle" deyin.</p>';
+    const [d,no]=sel.value.split('|');
+    const v=DB.vouchers.find(x=>ymd(x.date)===d && String(x.no)===no);
+    if(!v) return '<p>Fiş bulunamadı.</p>';
+    const lines = (v.lines||[]).map(ln=>{
+      const accName = getAccName(ln.account);
+      const fullAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
+      return `<tr>
+        <td>${fullAcc}</td>
+        <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
+        <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
+        <td class="desc-col">${escapeHTML(ln.desc||'')}</td>
+      </tr>`;
+    }).join('');
+    const td = (v.lines||[]).reduce((s,x)=>s+toNum(x.debit),0);
+    const tc = (v.lines||[]).reduce((s,x)=>s+toNum(x.credit),0);
+    return `
+      <div><b>Tarih:</b> ${escapeHTML(dmyFromISO(v.date))} &nbsp; <b>Fiş No:</b> ${escapeHTML(String(v.no||''))}</div>
+      <div><b>Açıklama:</b> ${escapeHTML(v.desc||'')}</div>
+      <table>
+        <thead><tr>
+          <th style="width:200px">Hesap Kodu & Adı</th>
+          <th class="right" style="width:110px">Borç</th>
+          <th class="right" style="width:110px">Alacak</th>
+          <th class="desc-col">Açıklama</th>
+        </tr></thead>
+        <tbody>${lines || '<tr><td colspan="4">Satır yok.</td></tr>'}</tbody>
+        <tfoot>
+          <tr>
+            <th class="right">TOPLAM</th>
+            <th class="right">${fmtNoZero(td)}</th>
+            <th class="right">${fmtNoZero(tc)}</th>
+            <th></th>
+          </tr>
+        </tfoot>
+      </table>`;
+  }
+
+  function bindReportButtons(){
+    populateReportAccountSelect();
+    document.getElementById('rpJournal').addEventListener('click', ()=>{
+      openReportInNewTab('Yevmiye Dökümü', makeJournalReportHTML());
+    });
+    document.getElementById('rpLedger').addEventListener('click', ()=>{
+      const acc = document.getElementById('rpAccount').value;
+      openReportInNewTab('Hesap Ekstresi', makeLedgerReportHTML(acc));
+    });
+    document.getElementById('rpTrial').addEventListener('click', ()=>{
+      openReportInNewTab('Mizan Raporu', makeTrialReportHTML());
+    });
+    document.getElementById('rpVoucher').addEventListener('click', ()=>{
+      openReportInNewTab('Fiş Baskısı', makeVoucherPrintHTML());
+    });
+  }
+
+  // ---------- Veri Yönetimi ----------
+  function exportJSON(){
+    const payload={ accounts: ACCOUNTS, vouchers: DB.vouchers };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='basit-muhasebe.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function importJSON(file){
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const data=JSON.parse(r.result);
+        if(!data||!Array.isArray(data.vouchers)) throw new Error('Geçersiz JSON');
+        DB.vouchers = data.vouchers;
+        saveDB(); refreshVoucherList(); renderMizan();
+        newVoucher();
+        setSavedMessage(false);
+        alert('Veri yüklendi.');
+      }catch(e){ alert('Yükleme hatası: '+e.message); }
+    };
+    r.readAsText(file, 'utf-8');
+  }
+
+  function exportTSV(){
+    const headers = ['Tarih','FişNo','FişAçıklaması','HesapKodu','Borç','Alacak','Açıklama'];
+    const rows = [headers.join('\t')];
+    DB.vouchers.forEach(v=>{
+      const tarih = dmyFromISO(v.date);
+      const fisNo = v.no ?? '';
+      const fisAc = v.desc ?? '';
+      (v.lines||[]).forEach(ln=>{
+        rows.push([tarih,fisNo,fisAc,ln.account||'',fmt(toNum(ln.debit)),fmt(toNum(ln.credit)),ln.desc||''].join('\t'));
+      });
+    });
+    const tsv = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([tsv], {type:'text/tab-separated-values;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'basit-muhasebe-fisler.tsv'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
+
+  function importVouchersTSV(file){
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const text = String(r.result).replace(/\r/g,'').trim();
+        if(!text) throw new Error('Boş dosya.');
+        const lines = text.split('\n').filter(x=>x.trim().length>0);
+        if(lines.length < 2) throw new Error('Veri satırı bulunamadı.');
+        const headerLine = lines[0];
+        const delim = headerLine.includes('\t') ? '\t' : (headerLine.includes(';') ? ';' : '\t');
+
+        const norm = s => String(s).toLowerCase()
+          .replace(/ı/g,'i').replace(/İ/g,'i')
+          .replace(/ş/g,'s').replace(/Ş/g,'s')
+          .replace(/ç/g,'c').replace(/Ç/g,'c')
+          .replace(/ğ/g,'g').replace(/Ğ/g,'g')
+          .replace(/ö/g,'o').replace(/Ö/g,'o')
+          .replace(/ü/g,'u').replace(/Ü/g,'u').trim();
+
+        const unquote = s => String(s??'').replace(/^"(.*)"$/,'$1');
+
+        const headers = headerLine.split(delim).map(h=>norm(h));
+        const idx = {
+          tarih:  headers.findIndex(h=>h.startsWith('tarih')),
+          fisno:  headers.findIndex(h=>h.includes('fis') && h.includes('no')),
+          fisac:  headers.findIndex(h=>h.includes('fis') && h.includes('acik')),
+          hesap:  headers.findIndex(h=>h.includes('hesap') && h.includes('kodu')),
+          borc:   headers.findIndex(h=>h.startsWith('borc')),
+          alacak: headers.findIndex(h=>h.startsWith('alacak')),
+          acik:   headers.findIndex(h=>h==='aciklama' || h.endsWith('aciklama')),
+        };
+        ['tarih','fisno','hesap','borc','alacak'].forEach(k=>{ if(idx[k]===-1) throw new Error(`Başlık eksik veya farklı: ${k}`); });
+
+        const groups = new Map(); // key=ISO|No
+        for(let i=1;i<lines.length;i++){
+          const parts = lines[i].split(delim);
+          if(parts.every(p=>!String(p).trim())) continue;
+
+          const dmy = unquote(parts[idx.tarih] ?? '');
+          const iso = isoFromDMY(dmy);
+          if(!iso) throw new Error(`Geçersiz tarih (${dmy}) satır ${i+1}`);
+
+          const no   = unquote(parts[idx.fisno] ?? '').toString().trim();
+          const fAc  = idx.fisac>-1 ? unquote(parts[idx.fisac] ?? '').toString().trim() : '';
+          const hesap= unquote(parts[idx.hesap] ?? '').toString().trim();
+          const borc = toNum(unquote(parts[idx.borc]));
+          const alac = toNum(unquote(parts[idx.alacak]));
+          const satA = idx.acik>-1 ? unquote(parts[idx.acik] ?? '').toString().trim() : '';
+
+          if(!hesap || !(borc>0 || alac>0)) continue;
+
+          const key = `${iso}|${no}`;
+          if(!groups.has(key)) groups.set(key, {date: iso, no: no, desc: fAc, lines: []});
+          const obj = groups.get(key);
+          if(!obj.desc && fAc) obj.desc = fAc;
+          obj.lines.push({ account:hesap, debit: borc>0?borc:0, credit: alac>0?alac:0, desc:satA });
+        }
+
+        let ok=0, fail=0, errs=[];
+        groups.forEach(v=>{ try{ upsertVoucher(v); ok++; } catch(e){ fail++; errs.push(e.message); } });
+
+        refreshVoucherList();
+        renderMizan();
+
+        const msg = `TSV içe aktarma tamamlandı. Başarılı fiş: ${ok}${fail?`, Hatalı: ${fail}`:''}`;
+        if(fail) alert(msg + '\nİlk hata: ' + (errs[0]||'')); else alert(msg);
+
+      }catch(e){ alert('TSV içe aktarma hatası: ' + e.message); }
+    };
+    r.readAsText(file, 'utf-8');
+  }
+
+  function exportAccountsTSV(){
+    const headers = ['Hesap Kodu', 'Hesap Adı', 'Taraf'];
+    const rows = [headers.join('\t')];
+    ACCOUNTS.forEach(acc => {
+      rows.push([acc.code, acc.name, acc.side].join('\t'));
+    });
+    const tsv = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hesap-plani.tsv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function importAccountsTSV(file){
+    const r = new FileReader();
+    r.onload = ()=>{
+      try {
+        const text = String(r.result).replace(/\r/g,'').trim();
+        if (!text) throw new Error('Boş dosya.');
+        const lines = text.split('\n').filter(x => x.trim().length > 0);
+        if (lines.length < 2) throw new Error('Hesap satırı bulunamadı.');
+
+        const headerLine = lines[0];
+        const delim = headerLine.includes('\t') ? '\t' : (headerLine.includes(';') ? ';' : '\t');
+
+        const norm = s => String(s).toLowerCase()
+          .replace(/ı/g,'i').replace(/İ/g,'i')
+          .replace(/ş/g,'s').replace(/Ş/g,'s')
+          .replace(/ç/g,'c').replace(/Ç/g,'c')
+          .replace(/ğ/g,'g').replace(/Ğ/g,'g')
+          .replace(/ö/g,'o').replace(/Ö/g,'o')
+          .replace(/ü/g,'u').replace(/Ü/g,'u').trim();
+
+        const unquote = s => String(s ?? '').replace(/^"(.*)"$/, '$1').trim();
+
+        const headers = headerLine.split(delim).map(h => norm(h));
+      const idx = {
+        code: headers.findIndex(h => h === 'hesap kodu' || h === 'hesap_kodu'),
+        name: headers.findIndex(h => h === 'hesap adi' || h === 'hesap_adi'), // HATALI KISIM DÜZELTİLDİ
+        side: headers.findIndex(h => h === 'taraf')
+      };
+
+      if (idx.code === -1 || idx.name === -1 || idx.side === -1) {
+          throw new Error('Gerekli başlıklar (Hesap Kodu, Hesap Adı, Taraf) bulunamadı.');
+        }
+
+        const newAccounts = [];
+        const validationErrors = [];
+        let okCount = 0;
+
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(delim);
+          if (parts.length < 3) {
+            validationErrors.push(`Satır ${i + 1}: Yetersiz sütun sayısı.`);
+            continue;
+          }
+
+          const code = unquote(parts[idx.code]);
+          const name = unquote(parts[idx.name]);
+          const side = unquote(parts[idx.side]).toUpperCase();
+
+          // Kontrol noktaları
+          if (!code || !name || !side) {
+            validationErrors.push(`Satır ${i + 1}: Hesap Kodu, Hesap Adı veya Taraf boş olamaz.`);
+            continue;
+          }
+          if (!/^\d+$/.test(code)) {
+            validationErrors.push(`Satır ${i + 1}: Hesap Kodu sadece rakamlardan oluşmalıdır.`);
+            continue;
+          }
+          if (side !== 'B' && side !== 'A') {
+            validationErrors.push(`Satır ${i + 1}: Taraf B (Borç) veya A (Alacak) olmalıdır.`);
+            continue;
+          }
+
+          if (newAccounts.some(a => a.code === code)) {
+            validationErrors.push(`Satır ${i + 1}: '${code}' kodlu hesap mükerrer.`);
+            continue;
+          }
+
+          newAccounts.push({ code, name, side });
+          okCount++;
+        }
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Dosyada hatalar var. İlk 5 hata:\n${validationErrors.slice(0, 5).join('\n')}`);
+        }
+
+        ACCOUNTS.splice(0, ACCOUNTS.length, ...newAccounts);
+        // UI bileşenlerini güncelle
+        newVoucher();
+        refreshVoucherList();
+        renderMizan();
+        populateReportAccountSelect();
+        alert(`Hesap planı başarıyla yüklendi. ${okCount} adet hesap eklendi.`);
+
+      } catch(e) {
+        alert('Hesap planı yükleme hatası: ' + e.message);
+      }
+    };
+    r.readAsText(file, 'utf-8');
+  }
+
+  function clearAll(){
+    if(!confirm('Tüm verileri silmek istediğinize emin misiniz?')) return;
+    localStorage.removeItem(STORE_KEY);
+    DB.vouchers=[];
+    refreshVoucherList();
+    newVoucher();
+    renderMizan();
+  }
+
+  // ---------- "Kalanı Dengele" (odak satır öncelikli + akıllı hedef) ----------
+  function pickPreferredAccount(rows){
+    if (LAST_USED_ACCOUNT && ACCOUNTS.some(a=>a.code===LAST_USED_ACCOUNT)) return LAST_USED_ACCOUNT;
+    for(let i=rows.length-1;i>=0;i--){
+      const acc = rows[i].children[0].querySelector('select').value;
+      if (acc) return acc;
+    }
+    const order = ['191','100','320','600','120','153','500'];
+    for(const code of order){
+      if (ACCOUNTS.some(a=>a.code===code)) return code;
+    }
+    return ACCOUNTS[0]?.code || '';
+  }
+
+  function balanceRemaining(){
+    const rows = [...document.querySelectorAll('#voucherTable tbody tr')];
+    if(rows.length<1) return;
+
+    const totals = rows.reduce((a,r)=>{
+      a.d += toNum(r.children[1].querySelector('input').value);
+      a.c += toNum(r.children[2].querySelector('input').value);
+      return a;
+    },{d:0,c:0});
+
+    const diff = +(totals.d - totals.c).toFixed(2); // + ise alacak yaz, - ise borç yaz
+    if(Math.abs(diff) < 0.01){ recalcVoucherTotals(); return; }
+
+    const needCredit = diff > 0; // Borç > Alacak → Alacak tarafına yaz
+    const amountStr = fmt(Math.abs(diff));
+
+    const preferredAcc = pickPreferredAccount(rows);
+
+    // 1) Odak satır boşsa önce onu doldur
+    const fr = CURRENT_VOUCHER_ROW && CURRENT_VOUCHER_ROW.isConnected ? CURRENT_VOUCHER_ROW : null;
+    if (fr && fr.closest('#voucherTable tbody')){
+      const accSel = fr.children[0].querySelector('select');
+      const drEl   = fr.children[1].querySelector('input');
+      const crEl   = fr.children[2].querySelector('input');
+
+      const drV = toNum(drEl.value);
+      const crV = toNum(crEl.value);
+
+      if (drV===0 && crV===0){
+        if (!accSel.value) accSel.value = preferredAcc;
+        if(needCredit){ crEl.value = amountStr; drEl.value = ''; }
+        else          { drEl.value = amountStr; crEl.value = ''; }
+        if (accSel.value) LAST_USED_ACCOUNT = accSel.value;
+        markDirty();
+        recalcVoucherTotals();
+        return;
+      }
+    }
+
+    // 2) Tercihli hesapla boş satır bul
+    let targetRow = null;
+    for(let i=rows.length-1; i>=0; i--){
+      const r = rows[i];
+      const acc = r.children[0].querySelector('select').value;
+      const dr = toNum(r.children[1].querySelector('input').value);
+      const cr = toNum(r.children[2].querySelector('input').value);
+      if(acc === preferredAcc && dr===0 && cr===0){ targetRow = r; break; }
+    }
+
+    // 3) Yoksa yeni satır ekle (tercihli hesapla)
+    if(!targetRow){
+      addVoucherRow({account: preferredAcc});
+      const all = document.querySelectorAll('#voucherTable tbody tr');
+      targetRow = all[all.length-1];
+    }
+
+    const drEl = targetRow.children[1].querySelector('input');
+    const crEl = targetRow.children[2].querySelector('input');
+
+    if(needCredit){ crEl.value = amountStr; drEl.value = ''; }
+    else          { drEl.value = amountStr; crEl.value = ''; }
+
+    markDirty();
+    recalcVoucherTotals();
+  }
+  
+  // ---------- Fatura Kısayolları ----------
+  function createPurchaseInvoice(){
+    const tbody = document.querySelector('#voucherTable tbody');
+    tbody.innerHTML = '';
+    
+    // 50000-100000 arasında son 3 hanesi sıfır olan rastgele sayı üret
+    const randomAmount = Math.floor(Math.random() * 51 + 50) * 1000; // 50000-100000 arası, 1000'in katları
+    
+    // KDV hesapla (%20)
+    const kdvAmount = randomAmount * 0.2;
+    
+    // Toplam tutar
+    const totalAmount = randomAmount + kdvAmount;
+    
+    // Satırları ekle
+    addVoucherRow({ 
+        account: '153', 
+        debit: randomAmount,
+        desc: 'mal alış faturası'
+    });
+    addVoucherRow({ 
+        account: '191', 
+        debit: kdvAmount,
+        desc: 'mal alış faturası KDV'
+    });
+    addVoucherRow({ 
+        account: '320', 
+        credit: totalAmount,
+        desc: 'mal alış faturası toplam'
+    });
+    
+    document.getElementById('v_desc').value = 'Alış Faturası';
+    markDirty();
+    recalcVoucherTotals();
+    const firstInput = tbody.querySelector('tr:first-child input.right');
+    if(firstInput) firstInput.focus();
+}
+
+  function createSalesInvoice(){
+    const tbody = document.querySelector('#voucherTable tbody');
+    tbody.innerHTML = '';
+    
+    // 50000-100000 arasında son 3 hanesi sıfır olan rastgele sayı üret
+    const randomAmount = Math.floor(Math.random() * 51 + 50) * 1000; // 50000-100000 arası, 1000'in katları
+    
+    // KDV hesapla (%20)
+    const kdvAmount = randomAmount * 0.2;
+    
+    // Toplam tutar
+    const totalAmount = randomAmount + kdvAmount;
+    
+    // Satırları ekle
+    addVoucherRow({ 
+        account: '120', 
+        debit: totalAmount,
+        desc: 'satış faturası toplam'
+    });
+    addVoucherRow({ 
+        account: '600', 
+        credit: randomAmount,
+        desc: 'satış faturası'
+    });
+    addVoucherRow({ 
+        account: '391', 
+        credit: kdvAmount,
+        desc: 'satış faturası KDV'
+    });
+    
+    document.getElementById('v_desc').value = 'Satış Faturası';
+    markDirty();
+    recalcVoucherTotals();
+    const firstInput = tbody.querySelector('tr:first-child input.right');
+    if(firstInput) firstInput.focus();
+}
+
+  // ---------- Enter ile ileri (Tab gibi) ----------
+  function focusablesInVoucher(){
+    return Array.from(document.querySelectorAll(
+      '#v_tarih, #v_fisno, #v_desc, #v_select, #voucherTable select, #voucherTable input, #v_balance, #v_save'
+    )).filter(el => !el.disabled && el.offsetParent !== null);
+  }
+  function focusNext(current){
+    const list = focusablesInVoucher();
+    const idx = list.indexOf(current);
+    if (idx === list.length - 1 && current.closest('#voucherTable')){
+      addVoucherRow();
+      const lastRow = document.querySelector('#voucherTable tbody tr:last-child');
+      if(lastRow) lastRow.querySelector('select')?.focus();
+      return;
+    }
+    if (idx > -1 && idx < list.length - 1){
+      list[idx+1].focus();
+      if (list[idx+1].select) list[idx+1].select();
+    }
+  }
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      const t = e.target;
+      if(t.closest('#voucherTable') || t.id==='v_desc' || t.id==='v_tarih'){
+        e.preventDefault();
+        focusNext(t);
+      }
+    }
+  });
+
+  // ---------- Kısayol: Ctrl/⌘+S ile Kaydet ----------
+  document.addEventListener('keydown', (e)=>{
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      const btn = document.getElementById('v_save');
+      if (!btn.disabled) saveVoucher();
+    }
+  });
+
+  // ---------- Odak satır takibi ----------
+  document.addEventListener('focusin', (e)=>{
+    const tr = e.target.closest('#voucherTable tbody tr');
+    if (tr) CURRENT_VOUCHER_ROW = tr;
+  });
+
+  // ---------- Sayfadan ayrılma uyarısı (dirty ise) ----------
+  window.addEventListener('beforeunload', (e)=>{
+    if (FORM_DIRTY) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ---------- Açılır-kapanır işlevi ----------
+  function setupCollapsible(btnId, contentId) {
+      const btn = document.getElementById(btnId);
+      const content = document.getElementById(contentId);
+
+      if (!btn || !content) return;
+
+      btn.addEventListener('click', () => {
+          const isExpanded = content.classList.toggle('is-expanded');
+          btn.textContent = isExpanded ? '[-]' : '[+]';
+          btn.setAttribute('aria-expanded', isExpanded);
+      });
+  }
+
+  // ---------- Başlat ----------
+  window.addEventListener('load', ()=>{
+    loadDB();
+
+    // Fiş formu
+    document.getElementById('v_balance').addEventListener('click', balanceRemaining);
+    document.getElementById('v_save').addEventListener('click', saveVoucher);
+    document.getElementById('v_load').addEventListener('click', loadSelectedVoucher);
+    // YENİ: "Fişi Güncelle" butonu pasif fişi düzenlemeye açar
+    document.getElementById('v_edit').addEventListener('click', ()=> setVoucherEditable(true));
+    document.getElementById('v_new').addEventListener('click', newVoucher);
+    document.getElementById('v_delete').addEventListener('click', deleteVoucher);
+    document.getElementById('btnPurchaseInv').addEventListener('click', createPurchaseInvoice);
+    document.getElementById('btnSalesInv').addEventListener('click', createSalesInvoice);
+
+    // Mizan
+    document.getElementById('btnMizan').addEventListener('click', renderMizan);
+    setupCollapsible('toggleMizan', 'mizanContent');
+
+    // Raporlar (yeni sekme)
+    bindReportButtons();
+    setupCollapsible('toggleReports', 'reportsContent');
+
+    // Veri yönetimi
+    document.getElementById('btnExport').addEventListener('click', exportJSON);
+    document.getElementById('fileImport').addEventListener('change', e=>{
+      const f=e.target.files[0]; if(f) importJSON(f); e.target.value='';
+    });
+    document.getElementById('btnExportTSV').addEventListener('click', exportTSV);
+    document.getElementById('fileImportTSV').addEventListener('change', e=>{
+      const f=e.target.files[0]; if(f) importVouchersTSV(f); e.target.value='';
+    });
+    document.getElementById('btnExportAccountsTSV').addEventListener('click', exportAccountsTSV);
+    document.getElementById('fileImportAccountsTSV').addEventListener('change', e=>{
+      const f=e.target.files[0]; if(f) importAccountsTSV(f); e.target.value='';
+    });
+    document.getElementById('btnClear').addEventListener('click', clearAll);
+    setupCollapsible('toggleData', 'dataContent');
+
+    // Üst alanlar "dirty"
+    document.getElementById('v_tarih').addEventListener('change', markDirty);
+    document.getElementById('v_desc').addEventListener('input', markDirty);
+    
+    document.getElementById('v_prev').addEventListener('click', ()=> navigateVoucher('prev')); // AŞAĞI (daha eski)
+    document.getElementById('v_next').addEventListener('click', ()=> navigateVoucher('next')); // YUKARI (daha yeni)
+
+    // Başlangıç durumu
+    newVoucher();
+    refreshVoucherList();
+    renderMizan();
+  });
+    
+</script>
+</body>
+</html>
