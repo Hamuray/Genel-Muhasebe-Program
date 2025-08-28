@@ -102,6 +102,26 @@ td.right, th.right{
   color:#9ca3af;           /* rakamları biraz daha soluk gri */
 }
 
+/* --- Fiş girişi: "Hesap Kodu ve Adı" sütununu biraz genişlet --- */
+/* Başlık hücresi (inline width=210px'i ezmek için !important gerekir) */
+#voucherTable thead th:first-child {
+  width: 260px !important; /* ihtiyaca göre artır/azalt */
+}
+
+/* Gövde hücresi azami genişlik */
+#voucherTable tbody td:first-child {
+  max-width: 260px;        /* başlıkla aynı tut */
+}
+
+/* İçteki select taşmasın; metin sığmazsa kısalt */
+#voucherTable tbody td:first-child select {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Fiş alanı pasifken görsel ipucu (opsiyonel) */
 fieldset.readonly {
   outline: 2px dashed #e5e7eb;
@@ -264,6 +284,7 @@ fieldset.readonly {
           <button id="rpLedger">Hesap Ekstresi</button>
           <button id="rpTrial">Mizan Raporu</button>
           <button id="rpVoucher">Seçili Fiş Baskısı</button>
+          <button id="rpJournal2">Yevmiye Dökümü 2</button>
         </div>
       </div>
     </fieldset>
@@ -1340,66 +1361,157 @@ function renderMizan(){
 
   // ---------- Raporlar ----------
   function makeJournalReportHTML(){
-    const {from,to} = getReportRange();
-    const sortedVouchers = [...DB.vouchers].sort((a,b)=> Number(a.no) - Number(b.no) || ymd(a.date).localeCompare(ymd(b.date)));
+  const {from,to} = getReportRange();
+  const sortedVouchers = [...DB.vouchers].sort(
+    (a,b)=> Number(a.no) - Number(b.no) || ymd(a.date).localeCompare(ymd(b.date))
+  );
 
-    let allRows = '';
-    let totalDebit = 0;
-    let totalCredit = 0;
-    let lastVoucherNo = null;
+  let allRows = '';
+  let totalDebit = 0;
+  let totalCredit = 0;
+  let lastVoucherNo = null;
 
-    for (const v of sortedVouchers) {
-        const vd = parseDateInput(ymd(v.date));
-        if(!inRange(vd, from, to)) continue;
+  // Alacak satırları için 5 boşluk
+  const INDENT = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
 
-        // Fiş numarası değiştiğinde ayırıcı ekle
-        if (lastVoucherNo !== null && v.no !== lastVoucherNo) {
-            allRows += `<tr class="voucher-separator"><td colspan="7"></td></tr>`;
-        }
+  for (const v of sortedVouchers) {
+    const vd = parseDateInput(ymd(v.date));
+    if(!inRange(vd, from, to)) continue;
 
-        (v.lines||[]).forEach(ln=>{
-            const accName = getAccName(ln.account);
-            const fullAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
-            allRows += `<tr>
-                <td>${escapeHTML(String(v.no))}</td>
-                <td>${escapeHTML(dmyFromISO(v.date))}</td>
-                <td class="desc-col">${escapeHTML(v.desc)}</td>
-                <td>${fullAcc}</td>
-                <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
-                <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
-                <td class="desc-col">${escapeHTML(ln.desc)}</td>
-            </tr>`;
-            totalDebit += toNum(ln.debit);
-            totalCredit += toNum(ln.credit);
-        });
-
-        lastVoucherNo = v.no;
+    // Fiş numarası değiştiğinde ayırıcı ekle
+    if (lastVoucherNo !== null && v.no !== lastVoucherNo) {
+      allRows += `<tr class="voucher-separator"><td colspan="7"></td></tr>`;
     }
 
-    return `
-      <table>
-        <thead>
-          <tr>
-            <th style="width:70px">Fiş No</th>
-            <th style="width:90px">Tarih</th>
-            <th class="desc-col">Fiş Açıklaması</th>
-            <th style="width:120px">Hesap Kodu & Adı</th>
-            <th class="right" style="width:110px">Borç</th>
-            <th class="right" style="width:110px">Alacak</th>
-            <th class="desc-col">Açıklama</th>
-          </tr>
-        </thead>
-        <tbody>${allRows || '<tr><td colspan="7">Kayıt bulunamadı.</td></tr>'}</tbody>
-        <tfoot>
-          <tr>
-            <th colspan="4" class="right">GENEL TOPLAM</th>
-            <th class="right">${fmtNoZero(totalDebit)}</th>
-            <th class="right">${fmtNoZero(totalCredit)}</th>
-            <th></th>
-          </tr>
-        </tfoot>
-      </table>`;
+    (v.lines||[]).forEach(ln=>{
+      const accName = getAccName(ln.account);
+      const baseAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
+
+      // Alacak satırı mı? (borç=0, alacak>0)
+      const isCredit = toNum(ln.credit) > 0 && toNum(ln.debit) === 0;
+
+      // Alacaksa başına 5 boşluk ekle
+      const fullAccCell = (isCredit ? INDENT : '') + baseAcc;
+
+      allRows += `<tr>
+          <td>${escapeHTML(String(v.no))}</td>
+          <td>${escapeHTML(dmyFromISO(v.date))}</td>
+          <td class="desc-col">${escapeHTML(v.desc)}</td>
+          <td>${fullAccCell}</td>
+          <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
+          <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
+          <td class="desc-col">${escapeHTML(ln.desc)}</td>
+      </tr>`;
+
+      totalDebit  += toNum(ln.debit);
+      totalCredit += toNum(ln.credit);
+    });
+
+    lastVoucherNo = v.no;
+  }
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th style="width:70px">Fiş No</th>
+          <th style="width:90px">Tarih</th>
+          <th class="desc-col">Fiş Açıklaması</th>
+          <th style="width:120px">Hesap Kodu & Adı</th>
+          <th class="right" style="width:110px">Borç</th>
+          <th class="right" style="width:110px">Alacak</th>
+          <th class="desc-col">Açıklama</th>
+        </tr>
+      </thead>
+      <tbody>${allRows || '<tr><td colspan="7">Kayıt bulunamadı.</td></tr>'}</tbody>
+      <tfoot>
+        <tr>
+          <th colspan="4" class="right">GENEL TOPLAM</th>
+          <th class="right">${fmtNoZero(totalDebit)}</th>
+          <th class="right">${fmtNoZero(totalCredit)}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>`;
 }
+
+function makeJournalReport2HTML(){
+  const {from,to} = getReportRange();
+  const sorted = [...DB.vouchers].sort(
+    (a,b)=> Number(a.no) - Number(b.no) || ymd(a.date).localeCompare(ymd(b.date))
+  );
+
+  // Düzen (ince ayar)
+  const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
+  const TOTAL = 68;      // Üst çizginin uzunluğu ve sol kolon genişliği (karakter)
+  const W_DEBIT = 13;    // BORÇ kolon genişliği (karakter)
+  const W_CREDIT = 13;   // ALACAK kolon genişliği (karakter)
+  const SEP = '  ';      // kolonlar arası boşluk
+  const W_LEFT = TOTAL - W_DEBIT - W_CREDIT - SEP.length*2;
+
+  const cut  = (s,w)=> String(s||'').length>w ? String(s).slice(0,w) : String(s||'');
+  const padL = (s,w)=>{ s=String(s||''); return s.length>=w ? s.slice(-w) : ' '.repeat(w-s.length)+s; };
+  const padR = (s,w)=>{ s=String(s||''); return s.length>=w ? s.slice(0,w) : s+' '.repeat(w-s.length); };
+  const row  = (left,db,cr)=> padR(cut(left,W_LEFT),W_LEFT) + SEP + padL(cut(db,W_DEBIT),W_DEBIT) + SEP + padL(cut(cr,W_CREDIT),W_CREDIT);
+
+  // "Fiş No ---- Tarih ----" üst çizgisi
+  const headLine = (no,dateText)=>{
+    const left = String(no||'');
+    const mid  = String(dateText||'');
+    const dashRoom = TOTAL - left.length - mid.length;
+    const leftDash  = Math.max(0, Math.floor(dashRoom/2));
+    const rightDash = Math.max(0, dashRoom - leftDash);
+    return left + '-'.repeat(leftDash) + mid + '-'.repeat(rightDash);
+  };
+
+  const blocks = [];
+
+  for (const v of sorted){
+    const vd = parseDateInput(ymd(v.date));
+    if(!inRange(vd, from, to)) continue;
+
+    const lines = [];
+
+    // 1) Üst çizgi: "No ---- Tarih ----"
+    lines.push(headLine(String(v.no||''), dmyFromISO(v.date)));
+
+    // 2) Başlıklar ve alt çizgileri (6 karakter)
+    lines.push(row('', 'BORÇ', 'ALACAK'));
+    lines.push(row('', '______', '______')); // ← 6 karakter alt çizgi
+
+    // 3) Hesap satırları (alacak 5 boşluk içeriden)
+    (v.lines||[]).forEach(ln=>{
+      const accName = getAccName(ln.account);
+      const baseAcc = `${String(ln.account||'')}.${accName||''}`;
+      const isCredit = toNum(ln.credit) > 0 && toNum(ln.debit) === 0;
+      const leftText = (isCredit ? '     ' : '') + baseAcc; // 5 boşluk
+      const d = fmtNoZero(toNum(ln.debit));
+      const c = fmtNoZero(toNum(ln.credit));
+      lines.push(row(leftText, d, c));
+    });
+
+    // 4) Açıklama satırı (çizgiler arasında kalır)
+    const parts = [];
+    if (v.desc) parts.push(v.desc);
+    (v.lines||[]).forEach(ln=>{ if(ln.desc) parts.push(ln.desc); });
+    const descLine = 'Açıklama: ' + (parts.join(', ') || '');
+    lines.push(padR(cut(descLine, TOTAL), TOTAL));
+
+    // 5) (Önceden eklediğimiz ayırıcı çizgi KALDIRILDI) — sadece boş satır bırak
+    lines.push('');
+
+    blocks.push(
+      `<div style="white-space:pre; font-family:${MONO}; line-height:1.25; margin:0 0 6px 0">${escapeHTML(lines.join('\n'))}</div>`
+    );
+  }
+
+  if (!blocks.length){
+    return `<div style="white-space:pre; font-family:${MONO}">Kayıt bulunamadı.</div>`;
+  }
+
+  return `<div style="width:auto">${blocks.join('')}</div>`;
+}
+
 
   function makeLedgerReportHTML(accountCode){
     if(!accountCode) return `<p>Lütfen hesap seçin.</p>`;
@@ -1609,6 +1721,11 @@ function renderMizan(){
     document.getElementById('rpVoucher').addEventListener('click', ()=>{
       openReportInNewTab('Fiş Baskısı', makeVoucherPrintHTML());
     });
+
+    document.getElementById('rpJournal2').addEventListener('click', ()=>{
+      openReportInNewTab('Yevmiye Dökümü 2', makeJournalReport2HTML());
+});
+
   }
 
   // ---------- Veri Yönetimi ----------
