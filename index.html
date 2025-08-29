@@ -212,6 +212,9 @@ fieldset.readonly {
             <option value="kredi">Kredi Kullanımı</option>
             <option value="demirbas">Demirbaş Alımı</option>
             <option value="banka2kasa">Bankadan Kasaya</option>
+            <option value="smm">Satılan Mal Maliyeti</option>
+            <option value="ucret">Ücret Hakedişi</option>
+
           </select>
         </div>
       </div>
@@ -1666,45 +1669,57 @@ function makeJournalReport2HTML(){
 }
 
 
-  function makeVoucherPrintHTML(){
-    const sel=document.getElementById('v_select');
-    if(!sel || !sel.value) return '<p>Lütfen üstte "Kayıtlı Fişler"den bir fiş seçip "Yükle" deyin.</p>';
-    const [d,no]=sel.value.split('|');
-    const v=DB.vouchers.find(x=>ymd(x.date)===d && String(x.no)===no);
-    if(!v) return '<p>Fiş bulunamadı.</p>';
-    const lines = (v.lines||[]).map(ln=>{
-      const accName = getAccName(ln.account);
-      const fullAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
-      return `<tr>
-        <td>${fullAcc}</td>
-        <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
-        <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
-        <td class="desc-col">${escapeHTML(ln.desc||'')}</td>
-      </tr>`;
-    }).join('');
-    const td = (v.lines||[]).reduce((s,x)=>s+toNum(x.debit),0);
-    const tc = (v.lines||[]).reduce((s,x)=>s+toNum(x.credit),0);
-    return `
-      <div><b>Tarih:</b> ${escapeHTML(dmyFromISO(v.date))} &nbsp; <b>Fiş No:</b> ${escapeHTML(String(v.no||''))}</div>
-      <div><b>Açıklama:</b> ${escapeHTML(v.desc||'')}</div>
-      <table>
-        <thead><tr>
-          <th style="width:200px">Hesap Kodu & Adı</th>
-          <th class="right" style="width:110px">Borç</th>
-          <th class="right" style="width:110px">Alacak</th>
-          <th class="desc-col">Açıklama</th>
-        </tr></thead>
-        <tbody>${lines || '<tr><td colspan="4">Satır yok.</td></tr>'}</tbody>
-        <tfoot>
-          <tr>
-            <th class="right">TOPLAM</th>
-            <th class="right">${fmtNoZero(td)}</th>
-            <th class="right">${fmtNoZero(tc)}</th>
-            <th></th>
-          </tr>
-        </tfoot>
-      </table>`;
-  }
+function makeVoucherPrintHTML(){
+  const sel=document.getElementById('v_select');
+  if(!sel || !sel.value) return '<p>Lütfen üstte "Kayıtlı Fişler"den bir fiş seçip "Yükle" deyin.</p>';
+  const [d,no]=sel.value.split('|');
+  const v=DB.vouchers.find(x=>ymd(x.date)===d && String(x.no)===no);
+  if(!v) return '<p>Fiş bulunamadı.</p>';
+
+  // Alacak satırları için 5 boşluk (non-breaking space)
+  const INDENT = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+
+  const lines = (v.lines||[]).map(ln=>{
+    const accName = getAccName(ln.account);
+    const baseAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
+
+    // Sadece ALACAK yazılan satırları içerden başlat
+    const isCredit = toNum(ln.credit) > 0 && toNum(ln.debit) === 0;
+    const accCell  = (isCredit ? INDENT : '') + baseAcc;
+
+    return `<tr>
+      <td>${accCell}</td>
+      <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
+      <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
+      <td class="desc-col">${escapeHTML(ln.desc||'')}</td>
+    </tr>`;
+  }).join('');
+
+  const td = (v.lines||[]).reduce((s,x)=>s+toNum(x.debit),0);
+  const tc = (v.lines||[]).reduce((s,x)=>s+toNum(x.credit),0);
+
+  return `
+    <div><b>Tarih:</b> ${escapeHTML(dmyFromISO(v.date))} &nbsp; <b>Fiş No:</b> ${escapeHTML(String(v.no||''))}</div>
+    <div><b>Açıklama:</b> ${escapeHTML(v.desc||'')}</div>
+    <table>
+      <thead><tr>
+        <th style="width:200px">Hesap Kodu & Adı</th>
+        <th class="right" style="width:110px">Borç</th>
+        <th class="right" style="width:110px">Alacak</th>
+        <th class="desc-col">Açıklama</th>
+      </tr></thead>
+      <tbody>${lines || '<tr><td colspan="4">Satır yok.</td></tr>'}</tbody>
+      <tfoot>
+        <tr>
+          <th class="right">TOPLAM</th>
+          <th class="right">${fmtNoZero(td)}</th>
+          <th class="right">${fmtNoZero(tc)}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
 
   function bindReportButtons(){
     populateReportAccountSelect();
@@ -2076,7 +2091,6 @@ function makeJournalReport2HTML(){
 }
 
 // ---------- ŞABLONLAR (Dropdown) ----------
-// ---------- ŞABLONLAR (Dropdown) ----------
 function applyTemplateByKey(key){
   // Pasif fişte çalışmasın
   if (READONLY_MODE){
@@ -2119,7 +2133,7 @@ function applyTemplateByKey(key){
     document.getElementById('v_desc').value = 'Satıcıya Ödeme';
   }
   else if (key === 'kredi'){
-    // Kredi Kullanımı (talebe göre 300 borç, 102 alacak)
+    // Kredi Kullanımı — mevcut davranış korunur: 102 borç / 300 alacak
     const tutar = randomThousandBetween(10000, 50000);
 
     addVoucherRow({ account:'102', debit: tutar,  desc:'kredi kullanımı' });
@@ -2145,6 +2159,24 @@ function applyTemplateByKey(key){
 
     document.getElementById('v_desc').value = 'Bankadan Kasaya';
   }
+  else if (key === 'smm'){
+    // Satılan Mal Maliyeti
+    const tutar = randomThousandBetween(50000, 100000); // 50.000–100.000
+
+    addVoucherRow({ account:'621', debit: tutar,  desc:'satılan mal maliyeti' });
+    addVoucherRow({ account:'153', credit: tutar, desc:'satılan mal maliyeti' });
+
+    document.getElementById('v_desc').value = 'Satılan Mal Maliyeti';
+  }
+  else if (key === 'ucret'){
+    // Ücret Hakedişi
+    const tutar = randomThousandBetween(30000, 50000); // 30.000–50.000
+
+    addVoucherRow({ account:'632', debit: tutar,  desc:'ücret hakedişi' });
+    addVoucherRow({ account:'335', credit: tutar, desc:'ücret hakedişi' });
+
+    document.getElementById('v_desc').value = 'Ücret Hakedişi';
+  }
 
   markDirty();
   recalcVoucherTotals();
@@ -2157,6 +2189,7 @@ function applyTemplateByKey(key){
   const sel = document.getElementById('tplSelect');
   if (sel) sel.value = '';
 }
+
 
 
   function createSalesInvoice(){
