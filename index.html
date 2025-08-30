@@ -47,8 +47,8 @@ td.right, th.right{
 /* Mizan’da uzun metin beklenen kolonlarda (Adı, Not) kırılmaya izin ver */
 #mizanTable td:nth-child(2),
 #mizanTable th:nth-child(2),
-#mizanTable td:nth-child(8),
-#mizanTable th:nth-child(8){
+#mizanTable td:nth-child(9),
+#mizanTable th:nth-child(9){
   white-space: normal;
   word-break: break-word;
 }
@@ -76,7 +76,7 @@ td.right, th.right{
 }
 
 /* Açıklama hücresindeki input tam genişlik olsun */
-#voucherTable td:nth-child(4) input[type="text"] {
+#voucherTable td:nth-child(5) input[type="text"] {
   width: 100%;
   box-sizing: border-box;
 }
@@ -84,7 +84,7 @@ td.right, th.right{
 /* Hesap ekstresi raporunda 3. sütun (Açıklama) genişliği */
 .report table th:nth-child(3),
 .report table td:nth-child(3) {
-  width: 100px;         /* istediğin px değerini ayarla */
+  width: 100px;        /* istediğin px değerini ayarla */
   max-width: 100px;
   white-space: nowrap;  
   overflow: hidden;
@@ -96,10 +96,10 @@ td.right, th.right{
 #voucherTable input:disabled,
 #voucherTable select:disabled {
   background:#f3f4f6;
-  color:#6b7280;           /* metinler gri */
+  color:#6b7280;          /* metinler gri */
 }
 #voucherTable input.right:disabled {
-  color:#9ca3af;           /* rakamları biraz daha soluk gri */
+  color:#9ca3af;          /* rakamları biraz daha soluk gri */
 }
 
 /* --- Fiş girişi: "Hesap Kodu ve Adı" sütununu biraz genişlet --- */
@@ -110,7 +110,7 @@ td.right, th.right{
 
 /* Gövde hücresi azami genişlik */
 #voucherTable tbody td:first-child {
-  max-width: 260px;        /* başlıkla aynı tut */
+  max-width: 260px;       /* başlıkla aynı tut */
 }
 
 /* İçteki select taşmasın; metin sığmazsa kısalt */
@@ -125,6 +125,29 @@ td.right, th.right{
 /* Fiş alanı pasifken görsel ipucu (opsiyonel) */
 fieldset.readonly {
   outline: 2px dashed #e5e7eb;
+}
+
+/* === Fiş tablosu kolon genişlikleri (override) === */
+/* 1) "Hesap Kodu ve Adı" genişlet */
+#voucherTable thead th:nth-child(1){ width: 340px !important; }
+#voucherTable tbody td:nth-child(1){ max-width: 340px; }
+#voucherTable tbody td:nth-child(1) select{
+  width:100%; box-sizing:border-box; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* 2) Borç / Alacak / Miktar daralt */
+#voucherTable thead th:nth-child(2),
+#voucherTable thead th:nth-child(3){ width:110px !important; }
+#voucherTable thead th:nth-child(4){ width:90px !important; }
+#voucherTable tbody td:nth-child(2) input,
+#voucherTable tbody td:nth-child(3) input,
+#voucherTable tbody td:nth-child(4) input{ width:100%; box-sizing:border-box; }
+
+/* 3) "Ekle" sütununu az genişlet + butonu küçült */
+#voucherTable thead th:nth-child(8){ width:100px !important; }
+#voucherTable td:last-child button,
+#voucherTable button.btn-mini-add{
+  font-size:12px; padding:4px 8px; border-radius:8px;
 }
 
   </style>
@@ -155,7 +178,6 @@ fieldset.readonly {
           <label for="v_select">Kayıtlı Fişler</label>
           <select id="v_select" style="min-width:320px"></select>
         </div>
-        <!-- ÜST SATIR: Yükle + Gezinti (sağa hizalı) -->
         <div class="toolbar" style="align-self:end; margin-left:auto; display:flex; gap:8px">
           <button id="v_load">Yükle</button>
           <button id="v_edit" class="primary" title="Bu fişi düzenlemeye aç">Fişi Güncelle</button>
@@ -170,6 +192,7 @@ fieldset.readonly {
             <th style="width:210px">Hesap Kodu ve Adı</th>
             <th class="right" style="width:140px">Borç</th>
             <th class="right" style="width:140px">Alacak</th>
+            <th class="right" style="width:110px">Miktar</th>
             <th>Açıklama</th>
             <th style="width:90px">Kopyala</th>
             <th style="width:80px">Sil</th>
@@ -184,21 +207,19 @@ fieldset.readonly {
             <th class="right">TOPLAM</th>
             <th id="v_tdb" class="right">0,00</th>
             <th id="v_tcr" class="right">0,00</th>
+            <th id="v_tqty" class="right">0,00</th>
             <th colspan="4"></th>
           </tr>
         </tfoot>
       </table>
-      <!-- Alt buton grupları tek satırda hizalı -->
       <div class="toolbar" style="margin-top:8px; display:flex; justify-content:space-between; gap:8px">
 
-        <!-- Sol taraf -->
         <div style="display:flex; gap:8px">
           <button id="v_balance">Kalanı Dengele</button>
           <button id="v_save" class="primary" disabled>Kaydet</button>
           <span id="v_msg" class="muted" role="status" aria-live="polite"></span>
         </div>
 
-        <!-- Sağ taraf -->
         <div style="display:flex; gap:8px">
           <button id="v_new">Yeni</button>
           <button id="v_delete" class="danger">Sil</button>
@@ -247,6 +268,7 @@ fieldset.readonly {
               <th class="right">Borç Bakiye</th>
               <th class="right">Alacak Bakiye</th>
               <th style="width:60px">Taraf</th>
+              <th class="right">Miktar</th>
               <th>Not</th>
             </tr>
           </thead>
@@ -258,7 +280,9 @@ fieldset.readonly {
               <th id="tCR" class="right">0,00</th>
               <th id="tBorcBakiye" class="right">0,00</th>
               <th id="tAlacakBakiye" class="right">0,00</th>
-              <th colspan="2"></th>
+              <th></th>
+              <th id="tMiktar" class="right">0,00</th>
+              <th></th>
             </tr>
           </tfoot>
         </table>
@@ -288,6 +312,9 @@ fieldset.readonly {
           <button id="rpTrial">Mizan Raporu</button>
           <button id="rpVoucher">Seçili Fiş Baskısı</button>
           <button id="rpJournal2">Yevmiye Dökümü 2</button>
+          <button id="rpStock">Stok Raporu</button>
+          <button id="rpIncome">Kar/Zarar Raporu</button>
+          <button id="rpBalance">Bilanço</button>
         </div>
       </div>
     </fieldset>
@@ -321,7 +348,10 @@ fieldset.readonly {
       </div>
     </fieldset>
 
-    <div class="hint">© Tek dosya demo. Hesap planı sabittir: 100/120/153/191/320/391/600/500.</div>
+    
+    <div class="hint">©Ali Hakan Mutluay - amutluay@gmail.com - 
+      <a href="https://www.muhasebe.info" target="_blank" rel="noopener noreferrer">www.muhasebe.info</a>
+    </div>
   </div>
 
 <script>
@@ -349,7 +379,7 @@ fieldset.readonly {
   let LAST_USED_ACCOUNT = '';
   let CURRENT_VOUCHER_ROW = null; // imlecin (focus) olduğu tr
 
-   let ACCOUNTS = [
+  let ACCOUNTS = [
     {code:'100', name:'KASA', side:'B'},
     {code:'101', name:'ALINAN ÇEKLER', side:'B'},
     {code:'102', name:'BANKALAR', side:'B'},
@@ -634,7 +664,7 @@ fieldset.readonly {
 
 
   const STORE_KEY = 'bmuhasebe_v2_vouchers_only';
-  let DB = { vouchers: [] }; // {date,no,desc,lines:[{account,debit,credit,desc}]}
+  let DB = { vouchers: [] }; // {date,no,desc,lines:[{account,debit,credit,quantity,desc}]}
 
   // ---------- Yardımcılar ----------
   function fmt(n){
@@ -845,7 +875,14 @@ function randomThousandBetween(min=10000, max=50000){
   cr.value = (pref.credit ?? pref.alacak) ? fmt(toNum(pref.credit ?? pref.alacak)) : '';
   tdCr.appendChild(cr);
 
-  // --- 4. Açıklama ---
+  // --- 4. Miktar ---
+  const tdQty = document.createElement('td');
+  const qty = document.createElement('input');
+  qty.type = 'text'; qty.className = 'right'; qty.setAttribute('inputmode', 'decimal');
+  qty.value = (pref.quantity ?? pref.miktar) ? fmt(toNum(pref.quantity ?? pref.miktar)) : '';
+  tdQty.appendChild(qty);
+
+  // --- 5. Açıklama ---
   const tdDc = document.createElement('td');
   const dc = document.createElement('input');
   dc.type = 'text'; dc.placeholder = 'Açıklama';
@@ -853,18 +890,20 @@ function randomThousandBetween(min=10000, max=50000){
   dc.maxLength = 50;
   tdDc.appendChild(dc);
 
-  // --- 5. Kopyala ---
+  // --- 6. Kopyala ---
   const tdCopy = document.createElement('td');
   const btnCopy = document.createElement('button');
   btnCopy.textContent = 'Kopyala';
   btnCopy.title = 'Bu satırı kopyala';
+  btnCopy.classList.add('btn-mini-add');   // YENİ: Ekle ile aynı mini buton stili
   btnCopy.addEventListener('click', ()=>{
     const acc = sel.value || '';
     const dv  = toNum(dr.value);
     const cv  = toNum(cr.value);
+    const qv  = toNum(qty.value);
     const dsc = dc.value || '';
     const last = addVoucherRow(
-      { account: acc, debit: dv ? dv : '', credit: cv ? cv : '', desc: dsc },
+      { account: acc, debit: dv ? dv : '', credit: cv ? cv : '', quantity: qv ? qv : '', desc: dsc },
       tr // altına ekle
     );
     const target = dv ? last.children[1].querySelector('input')
@@ -875,18 +914,20 @@ function randomThousandBetween(min=10000, max=50000){
   });
   tdCopy.appendChild(btnCopy);
 
-  // --- 6. Sil ---
+  // --- 7. Sil ---
   const tdDel = document.createElement('td');
   const del = document.createElement('button');
   del.textContent = 'Sil';
   del.title = 'Satırı Sil';
+  del.classList.add('btn-mini-add');       // YENİ: Ekle ile aynı mini buton stili
   del.onclick = ()=>{ tr.remove(); recalcVoucherTotals(); markDirty(); };
   tdDel.appendChild(del);
 
-  // --- 7. Ekle (+ Satır)  [YENİ HÜCRE] ---
+    // --- 8. Ekle (+ Satır) ---
   const tdAdd = document.createElement('td');
   const btnAdd = document.createElement('button');
-  btnAdd.textContent = '+ Satır';
+  btnAdd.textContent = '+Satır';            // daha kısa etiket
+  btnAdd.classList.add('btn-mini-add');    // küçük buton stili (CSS’te tanımladık)
   btnAdd.title = 'Bu satırın altına yeni satır ekle';
   btnAdd.addEventListener('click', ()=>{
     const newTr = addVoucherRow({}, tr); // bu satırın altına
@@ -900,10 +941,11 @@ function randomThousandBetween(min=10000, max=50000){
   tr.appendChild(tdAcc);
   tr.appendChild(tdDr);
   tr.appendChild(tdCr);
+  tr.appendChild(tdQty); // Miktar
   tr.appendChild(tdDc);
   tr.appendChild(tdCopy);
   tr.appendChild(tdDel);
-  tr.appendChild(tdAdd);     // <— YENİ sütun
+  tr.appendChild(tdAdd);
 
   if (afterTr && afterTr.parentNode === tb){
     tb.insertBefore(tr, afterTr.nextSibling);
@@ -914,9 +956,10 @@ function randomThousandBetween(min=10000, max=50000){
   // Maske ve tek-taraf kuralı
   attachMoneyMask(dr, cr);
   attachMoneyMask(cr, dr);
+  attachMoneyMask(qty, null); // Miktar için de maske
 
   // Odak takibi / dirty
-  [sel, dr, cr, dc].forEach(el=>{
+  [sel, dr, cr, qty, dc].forEach(el=>{
     el.addEventListener('focus', ()=>{ CURRENT_VOUCHER_ROW = tr; });
   });
   sel.addEventListener('change', markDirty);
@@ -935,8 +978,9 @@ function randomThousandBetween(min=10000, max=50000){
       const account=r.children[0].querySelector('select').value;
       const debit=toNum(r.children[1].querySelector('input').value);
       const credit=toNum(r.children[2].querySelector('input').value);
-      const desc = r.children[3].querySelector('input')?.value || '';
-      if (account && ((debit>0) !== (credit>0))) lines.push({account,debit,credit,desc});
+      const quantity=toNum(r.children[3].querySelector('input').value);
+      const desc = r.children[4].querySelector('input')?.value || '';
+      if (account && ((debit>0) !== (credit>0))) lines.push({account,debit,credit,quantity,desc});
     });
     const vdesc = document.getElementById('v_desc').value.trim();
     return {date, no, desc:vdesc, lines};
@@ -944,14 +988,16 @@ function randomThousandBetween(min=10000, max=50000){
 
   function recalcVoucherTotals(){
     const rows=document.querySelectorAll('#voucherTable tbody tr');
-    let td=0, tc=0, active=0;
+    let td=0, tc=0, tq=0, active=0;
     rows.forEach(r=>{
       const dv=toNum(r.children[1].querySelector('input').value);
       const cv=toNum(r.children[2].querySelector('input').value);
-      td+=dv; tc+=cv; if (dv>0 || cv>0) active++;
+      const qv=toNum(r.children[3].querySelector('input').value);
+      td+=dv; tc+=cv; tq+=qv; if (dv>0 || cv>0) active++;
     });
     document.getElementById('v_tdb').textContent=fmt(td);
     document.getElementById('v_tcr').textContent=fmt(tc);
+    document.getElementById('v_tqty').textContent=fmt(tq);
     const ok = active>=2 && Math.abs(td-tc)<0.005 && td>0 && tc>0;
     const btn=document.getElementById('v_save');
     btn.disabled = READONLY_MODE || !ok;
@@ -963,7 +1009,7 @@ function setVoucherEditable(isEditable){
   READONLY_MODE = !isEditable;
 
   // Fiş alanı fieldset'ini pasifken işaretle
-  const fisFieldset = document.querySelector('legend')?.textContent?.includes('Yeni Fiş')
+  const fisFieldset = document.querySelector('legend')?.textContent?.includes('Fiş Girişi')
     ? document.querySelector('legend').closest('fieldset') : null;
   if (fisFieldset) fisFieldset.classList.toggle('readonly', !isEditable);
 
@@ -988,7 +1034,7 @@ function setVoucherEditable(isEditable){
   if (editBtn) editBtn.disabled = isEditable;
 
   // Kaydet butonu: denge şartı + pasiflik birlikte değerlensin
-  recalcVoucherTotals(); // recalc içinde READONLY_MODE kontrolü var (bir sonraki adımda ekleyeceğiz)
+  recalcVoucherTotals();
 }
 
 
@@ -1130,7 +1176,7 @@ function deleteVoucher(){
     document.getElementById('v_fisno').value=v.no;
     document.getElementById('v_desc').value = v.desc || '';
     const tbody=document.querySelector('#voucherTable tbody'); tbody.innerHTML='';
-    (v.lines||[]).forEach(ln=> addVoucherRow({account:ln.account, debit:ln.debit, credit:ln.credit, desc:ln.desc}));
+    (v.lines||[]).forEach(ln=> addVoucherRow({account:ln.account, debit:ln.debit, credit:ln.credit, quantity:ln.quantity, desc:ln.desc}));
     if((v.lines||[]).length===0){ addVoucherRow(); addVoucherRow(); }
     recalcVoucherTotals();
 
@@ -1160,7 +1206,7 @@ function ensureSelectMatchesCurrent(){
 
 // --- Gezinme yardımcıları ---
 // directionStr: 'prev' = önceki fiş (kronolojik olarak daha eski, listede AŞAĞI),
-//                'next' = sonraki fiş (kronolojik olarak daha yeni, listede YUKARI)
+//               'next' = sonraki fiş (kronolojik olarak daha yeni, listede YUKARI)
 function navigateVoucher(directionStr){
   const sel = document.getElementById('v_select');
   if (!sel || !sel.options.length){
@@ -1191,11 +1237,11 @@ function navigateVoucher(directionStr){
 
   // Sınır mesajları (doğru uçlar)
   if (idx < 0){
-    alert('Zaten son fiştesiniz.');    // listenin en üstü = en yeni = "son fiş"
+    alert('Zaten son fiştesiniz.');   // listenin en üstü = en yeni = "son fiş"
     return;
   }
   if (idx >= sel.options.length){
-    alert('Zaten ilk fiştesiniz.');    // listenin en altı = en eski = "ilk fiş"
+    alert('Zaten ilk fiştesiniz.');   // listenin en altı = en eski = "ilk fiş"
     return;
   }
 
@@ -1213,10 +1259,10 @@ function renderMizan(){
   const from = parseDateInput(document.getElementById('mzFrom').value);
   const to   = parseDateInput(document.getElementById('mzTo').value);
 
-  // code -> {name, expected, debit, credit}
+  // code -> {name, expected, debit, credit, quantity}
   const map = {};
   ACCOUNTS.forEach(a=>{
-    map[a.code] = { name: a.name, expected: a.side || null, debit: 0, credit: 0 };
+    map[a.code] = { name: a.name, expected: a.side || null, debit: 0, credit: 0, quantity: 0 };
   });
 
   DB.vouchers.forEach(v=>{
@@ -1226,9 +1272,22 @@ function renderMizan(){
 
     (v.lines || []).forEach(ln=>{
       const code = ln.account;
-      if (!map[code]) map[code] = { name: getAccName(code), expected: null, debit: 0, credit: 0 };
+      if (!map[code]) map[code] = { name: getAccName(code), expected: null, debit: 0, credit: 0, quantity: 0 };
       map[code].debit  += toNum(ln.debit);
       map[code].credit += toNum(ln.credit);
+
+      // --- Miktar Hesaplama ---
+      const qtyValue = toNum(ln.quantity);
+      if (qtyValue !== 0) {
+          const accSide = map[code].expected; // 'B' veya 'A'
+          if (accSide === 'B') { // Borç karakterli hesap
+              if (toNum(ln.debit) > 0) map[code].quantity += qtyValue;
+              else if (toNum(ln.credit) > 0) map[code].quantity -= qtyValue;
+          } else if (accSide === 'A') { // Alacak karakterli hesap
+              if (toNum(ln.credit) > 0) map[code].quantity += qtyValue;
+              else if (toNum(ln.debit) > 0) map[code].quantity -= qtyValue;
+          }
+      }
     });
   });
 
@@ -1237,7 +1296,8 @@ function renderMizan(){
       name     : map[code].name,
       expected : map[code].expected,
       debit    : map[code].debit,
-      credit   : map[code].credit
+      credit   : map[code].credit,
+      quantity : map[code].quantity
     }))
     .filter(r => r.debit !== 0 || r.credit !== 0)
     .sort((a,b) => a.code.localeCompare(b.code)); // metin sırası
@@ -1263,15 +1323,17 @@ function renderMizan(){
       <td class="right">${side === 'B' ? fmtNoZero(bal) : ''}</td>
       <td class="right">${side === 'A' ? fmtNoZero(bal) : ''}</td>
       <td>${side}</td>
+      <td class="right">${fmtNoZero(r.quantity)}</td>
       <td>${escapeHTML(note)}</td>
     `;
     tb.appendChild(tr);
   });
 
   // Genel toplamlar
-  const t = rows.reduce((a,r)=>{ a.d += r.debit; a.c += r.credit; return a; }, {d:0,c:0});
+  const t = rows.reduce((a,r)=>{ a.d += r.debit; a.c += r.credit; a.q += r.quantity; return a; }, {d:0,c:0,q:0});
   document.getElementById('tDB').textContent = fmtNoZero(t.d);
   document.getElementById('tCR').textContent = fmtNoZero(t.c);
+  document.getElementById('tMiktar').textContent = fmtNoZero(t.q);
 
   // Bakiye toplamları (Borç/Alacak kolonlarının alt toplamları)
   const bTot = rows.reduce((a,r)=>{
@@ -1317,7 +1379,7 @@ function renderMizan(){
 
   /* "Açıklama" sütunu: başlık ve hücreler class="desc-col" */
   th.desc-col, td.desc-col{
-    width:220px;           /* ihtiyacına göre 200–280px arası oynatabilirsin */
+    width:220px;          /* ihtiyacına göre 200–280px arası oynatabilirsin */
     max-width:220px;
     white-space:nowrap;
     overflow:hidden;
@@ -1372,6 +1434,7 @@ function renderMizan(){
   let allRows = '';
   let totalDebit = 0;
   let totalCredit = 0;
+  let totalQuantity = 0;
   let lastVoucherNo = null;
 
   // Alacak satırları için 5 boşluk
@@ -1383,17 +1446,14 @@ function renderMizan(){
 
     // Fiş numarası değiştiğinde ayırıcı ekle
     if (lastVoucherNo !== null && v.no !== lastVoucherNo) {
-      allRows += `<tr class="voucher-separator"><td colspan="7"></td></tr>`;
+      allRows += `<tr class="voucher-separator"><td colspan="8"></td></tr>`;
     }
 
     (v.lines||[]).forEach(ln=>{
       const accName = getAccName(ln.account);
       const baseAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
 
-      // Alacak satırı mı? (borç=0, alacak>0)
       const isCredit = toNum(ln.credit) > 0 && toNum(ln.debit) === 0;
-
-      // Alacaksa başına 5 boşluk ekle
       const fullAccCell = (isCredit ? INDENT : '') + baseAcc;
 
       allRows += `<tr>
@@ -1403,11 +1463,13 @@ function renderMizan(){
           <td>${fullAccCell}</td>
           <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
           <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
+          <td class="right">${fmtNoZero(toNum(ln.quantity))}</td>
           <td class="desc-col">${escapeHTML(ln.desc)}</td>
       </tr>`;
 
       totalDebit  += toNum(ln.debit);
       totalCredit += toNum(ln.credit);
+      totalQuantity += toNum(ln.quantity);
     });
 
     lastVoucherNo = v.no;
@@ -1423,15 +1485,17 @@ function renderMizan(){
           <th style="width:120px">Hesap Kodu & Adı</th>
           <th class="right" style="width:110px">Borç</th>
           <th class="right" style="width:110px">Alacak</th>
+          <th class="right" style="width:110px">Miktar</th>
           <th class="desc-col">Açıklama</th>
         </tr>
       </thead>
-      <tbody>${allRows || '<tr><td colspan="7">Kayıt bulunamadı.</td></tr>'}</tbody>
+      <tbody>${allRows || '<tr><td colspan="8">Kayıt bulunamadı.</td></tr>'}</tbody>
       <tfoot>
         <tr>
           <th colspan="4" class="right">GENEL TOPLAM</th>
           <th class="right">${fmtNoZero(totalDebit)}</th>
           <th class="right">${fmtNoZero(totalCredit)}</th>
+          <th class="right">${fmtNoZero(totalQuantity)}</th>
           <th></th>
         </tr>
       </tfoot>
@@ -1518,7 +1582,7 @@ function makeJournalReport2HTML(){
 
   function makeLedgerReportHTML(accountCode){
     if(!accountCode) return `<p>Lütfen hesap seçin.</p>`;
-    const accMeta = ACCOUNTS.find(a=>a.code===accountCode) || {name:''};
+    const accMeta = ACCOUNTS.find(a=>a.code===accountCode) || {name:'', side: 'B'};
     const {from,to} = getReportRange();
     const items = [];
     DB.vouchers.forEach(v=>{
@@ -1528,7 +1592,7 @@ function makeJournalReport2HTML(){
         if(String(ln.account)===accountCode){
           items.push({
             tarih:dmyFromISO(v.date), isoDate: ymd(v.date), no:String(v.no||''), acik: ln.desc||v.desc||'',
-            borc: toNum(ln.debit), alacak: toNum(ln.credit)
+            borc: toNum(ln.debit), alacak: toNum(ln.credit), miktar: toNum(ln.quantity)
           });
         }
       });
@@ -1537,11 +1601,23 @@ function makeJournalReport2HTML(){
     items.sort((a,b)=>Number(a.no) - Number(b.no) || a.isoDate.localeCompare(b.isoDate));
     
     let balance = 0; // borç (+), alacak (-)
+    let qtyBalance = 0;
+    const accSide = accMeta.side;
+
     const trs = items.map(it=>{
-      balance += it.borc;
-      balance -= it.alacak;
+      balance += it.borc - it.alacak;
       const side = balance>=0 ? 'B' : 'A';
       const balAbs = Math.abs(balance);
+
+      // Miktar bakiyesini hesapla
+      if (it.miktar !== 0) {
+        if (accSide === 'B') {
+          if (it.borc > 0) qtyBalance += it.miktar; else qtyBalance -= it.miktar;
+        } else { // side === 'A'
+          if (it.alacak > 0) qtyBalance += it.miktar; else qtyBalance -= it.miktar;
+        }
+      }
+
       return `<tr>
         <td>${escapeHTML(it.tarih)}</td>
         <td>${escapeHTML(it.no)}</td>
@@ -1550,9 +1626,11 @@ function makeJournalReport2HTML(){
         <td class="right">${fmtNoZero(it.alacak)}</td>
         <td class="right">${fmtNoZero(balAbs)}</td>
         <td>${side}</td>
+        <td class="right">${fmtNoZero(it.miktar)}</td>
+        <td class="right">${fmtNoZero(qtyBalance)}</td>
       </tr>`;
     }).join('');
-    const totals = items.reduce((s,r)=>{s.d+=r.borc; s.c+=r.alacak; return s;}, {d:0,c:0});
+    const totals = items.reduce((s,r)=>{s.d+=r.borc; s.c+=r.alacak; s.q+=r.miktar; return s;}, {d:0,c:0,q:0});
     const sideEnd = balance>=0 ? 'B' : 'A';
     return `
       <div><b>Hesap:</b> ${escapeHTML(accountCode + ' ' + (accMeta.name||''))}</div>
@@ -1566,9 +1644,11 @@ function makeJournalReport2HTML(){
             <th style="width:100px" class="right">Alacak</th>
             <th style="width:120px" class="right">İşleyen Bakiye</th>
             <th style="width:50px">Taraf</th>
+            <th style="width:100px" class="right">Miktar</th>
+            <th style="width:120px" class="right">Miktar Bakiye</th>
           </tr>
-      </thead>
-        <tbody>${trs || '<tr><td colspan="7">Hareket bulunamadı.</td></tr>'}</tbody>
+        </thead>
+        <tbody>${trs || '<tr><td colspan="9">Hareket bulunamadı.</td></tr>'}</tbody>
         <tfoot>
           <tr>
             <th colspan="3" class="right">TOPLAM</th>
@@ -1576,6 +1656,8 @@ function makeJournalReport2HTML(){
             <th class="right">${fmtNoZero(totals.c)}</th>
             <th class="right">${fmtNoZero(Math.abs(balance))}</th>
             <th>${sideEnd}</th>
+            <th class="right">${fmtNoZero(totals.q)}</th>
+            <th class="right">${fmtNoZero(qtyBalance)}</th>
           </tr>
         </tfoot>
       </table>`;
@@ -1587,7 +1669,7 @@ function makeJournalReport2HTML(){
   // Hesap bazında topla
   const map = {};
   ACCOUNTS.forEach(a=>{
-    map[a.code] = { name: a.name, expected: a.side || null, debit: 0, credit: 0 };
+    map[a.code] = { name: a.name, expected: a.side || null, debit: 0, credit: 0, quantity: 0 };
   });
 
   DB.vouchers.forEach(v=>{
@@ -1595,9 +1677,21 @@ function makeJournalReport2HTML(){
     if (!inRange(d, from, to)) return;
     (v.lines || []).forEach(ln=>{
       const code = ln.account;
-      if (!map[code]) map[code] = { name: getAccName(code), expected: null, debit: 0, credit: 0 };
+      if (!map[code]) map[code] = { name: getAccName(code), expected: null, debit: 0, credit: 0, quantity: 0 };
       map[code].debit  += toNum(ln.debit);
       map[code].credit += toNum(ln.credit);
+
+      const qtyValue = toNum(ln.quantity);
+      if (qtyValue !== 0) {
+          const accSide = map[code].expected;
+          if (accSide === 'B') {
+              if (toNum(ln.debit) > 0) map[code].quantity += qtyValue;
+              else if (toNum(ln.credit) > 0) map[code].quantity -= qtyValue;
+          } else if (accSide === 'A') {
+              if (toNum(ln.credit) > 0) map[code].quantity += qtyValue;
+              else if (toNum(ln.debit) > 0) map[code].quantity -= qtyValue;
+          }
+      }
     });
   });
 
@@ -1606,7 +1700,8 @@ function makeJournalReport2HTML(){
     name     : map[code].name,
     expected : map[code].expected,
     debit    : map[code].debit,
-    credit   : map[code].credit
+    credit   : map[code].credit,
+    quantity : map[code].quantity
   }))
   .filter(r => r.debit !== 0 || r.credit !== 0)
   .sort((a,b)=> a.code.localeCompare(b.code));
@@ -1627,12 +1722,13 @@ function makeJournalReport2HTML(){
       <td class="right">${side==='B' ? fmtNoZero(bal) : ''}</td>
       <td class="right">${side==='A' ? fmtNoZero(bal) : ''}</td>
       <td>${side}</td>
+      <td class="right">${fmtNoZero(r.quantity)}</td>
       <td>${escapeHTML(note)}</td>
     </tr>`;
   }).join('');
 
   // Toplamlar
-  const t = rows.reduce((a,r)=>{ a.d += r.debit; a.c += r.credit; return a; }, {d:0, c:0});
+  const t = rows.reduce((a,r)=>{ a.d += r.debit; a.c += r.credit; a.q += r.quantity; return a; }, {d:0, c:0, q:0});
   const bTot = rows.reduce((a,r)=>{
     const diff = r.debit - r.credit;
     if (diff >= 0) a.borc += diff; else a.alacak += -diff;
@@ -1651,10 +1747,11 @@ function makeJournalReport2HTML(){
           <th class="right">Borç Bakiye</th>
           <th class="right">Alacak Bakiye</th>
           <th style="width:60px">Taraf</th>
+          <th class="right">Miktar</th>
           <th>Not</th>
         </tr>
       </thead>
-      <tbody>${trs || '<tr><td colspan="8">Kayıt bulunamadı.</td></tr>'}</tbody>
+      <tbody>${trs || '<tr><td colspan="9">Kayıt bulunamadı.</td></tr>'}</tbody>
       <tfoot>
         <tr>
           <th colspan="2" class="right">GENEL TOPLAM</th>
@@ -1662,12 +1759,696 @@ function makeJournalReport2HTML(){
           <th class="right">${fmtNoZero(t.c)}</th>
           <th class="right">${fmtNoZero(bTot.borc)}</th>
           <th class="right">${fmtNoZero(bTot.alacak)}</th>
-          <th colspan="2"></th>
+          <th></th>
+          <th class="right">${fmtNoZero(t.q)}</th>
+          <th></th>
         </tr>
       </tfoot>
     </table>`;
 }
 
+function makeIncomeReportHTML(){
+  // Tarih aralığı
+  const {from, to} = getReportRange();
+
+  // 6 ile başlayan hesaplar için net bakiye (Alacak - Borç).
+  // Pozitif = Alacak bakiye, Negatif = Borç bakiye.
+  const net = {}; // { '600': 12345, '630': -6789, ... }
+
+  DB.vouchers.forEach(v=>{
+    const d = parseDateInput(ymd(v.date));
+    if (!inRange(d, from, to)) return;
+    (v.lines||[]).forEach(ln=>{
+      const code = String(ln.account||'');
+      if (!code.startsWith('6')) return;  // yalnız 6xx
+      const dv = toNum(ln.debit);
+      const cv = toNum(ln.credit);
+      net[code] = (net[code]||0) + (cv - dv); // işaret kuralı burada
+    });
+  });
+
+  const getNet = (code)=> +(net[code] || 0);
+  const accName = (code)=> getAccName(code) || '';
+
+  // Yardımcı: verilen kod listesinden, hareketi olanları (net!=0) kod sırasına göre yaz
+  function rowsFor(codes){
+    return codes
+      .filter(c => getNet(c) !== 0)
+      .sort((a,b)=> a.localeCompare(b))
+      .map(c=>{
+        const label = `${escapeHTML(c)}. ${escapeHTML(accName(c))}`;
+        return `<tr><td>${label}</td><td class="right">${fmt(getNet(c))}</td></tr>`;
+      })
+      .join('');
+  }
+  const sum = (codes)=> codes.reduce((s,c)=> s + getNet(c), 0);
+
+  // Bölüm kod listeleri (sıralı)
+  const NET_SALES_CODES = ['600','601','602','610','611','612'];
+  const COST_CODES      = ['620','621','622','623'];
+  const OPEX_CODES      = ['630','631','632'];
+  const OTHER_INC_CODES = ['640','641','642','643','644','645','646','647','649'];
+  const OTHER_EXP_CODES = ['653','654','655','656','657','659','660','661'];
+  const EXTRA_INC_CODES = ['671','679'];
+  const EXTRA_EXP_CODES = ['680','681','689'];
+  const TAX_CODE        = '691';
+
+  // 1) NET SATIŞLAR
+  const netSalesRows = rowsFor(NET_SALES_CODES);
+  const netSales = sum(NET_SALES_CODES);
+
+  // 2) BRÜT KAR/ZARAR
+  const costRows = rowsFor(COST_CODES);
+  const costSum  = sum(COST_CODES);
+  const grossProfit = netSales + costSum; // maliyetler genelde negatif
+
+  // 3) FAALİYET KAR/ZARAR
+  const opexRows = rowsFor(OPEX_CODES);
+  const opexSum  = sum(OPEX_CODES);
+  const operatingProfit = grossProfit + opexSum;
+
+  // 4) OLAĞAN KAR/ZARAR
+  const otherIncRows = rowsFor(OTHER_INC_CODES);
+  const otherIncSum  = sum(OTHER_INC_CODES);
+  const otherExpRows = rowsFor(OTHER_EXP_CODES);
+  const otherExpSum  = sum(OTHER_EXP_CODES);
+  const ordinaryProfit = operatingProfit + otherIncSum + otherExpSum;
+
+  // 5) DÖNEM KAR/ZARAR
+  const extraIncRows = rowsFor(EXTRA_INC_CODES);
+  const extraIncSum  = sum(EXTRA_INC_CODES);
+  const extraExpRows = rowsFor(EXTRA_EXP_CODES);
+  const extraExpSum  = sum(EXTRA_EXP_CODES);
+  const periodProfit = ordinaryProfit + extraIncSum + extraExpSum;
+
+  // 6) 691 (Vergi ve yasal yük.) ve NET DÖNEM
+  const taxVal = getNet(TAX_CODE); // genelde negatif
+  const taxRow = (taxVal !== 0)
+    ? `<tr><td>${escapeHTML(TAX_CODE)}. ${escapeHTML(accName(TAX_CODE))}</td><td class="right">${fmt(taxVal)}</td></tr>`
+    : '';
+  const netPeriodProfit = periodProfit + taxVal;
+
+  // Not: Kullanılmayan hesaplar listelenmez.
+  // Ara başlıklar ise her durumda görünür; değerleri 0 ise 0,00 basarız (fmt).
+  return `
+  <style>
+    /* Sadece Kar/Zarar raporu için */
+    table.income-report { 
+      width: auto !important;      /* Genel 100% kuralını geçersiz kıl */
+      table-layout: fixed; 
+    }
+    table.income-report th, 
+    table.income-report td{
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* "Hesap Kodu ve Adı": 120 -> 40 gibi üçte birine indir */
+    table.income-report th:first-child,
+    table.income-report td:first-child{
+      width: 40px !important;
+    }
+    /* "Tutar": yarıya indir (örn. 60 -> 30, 160 -> 80) */
+    table.income-report th:last-child,
+    table.income-report td:last-child{
+      width: 80px !important; /* önce 160 yazdıysan yarısı 80; 60 idiysen 30 yap */
+    }
+  </style>
+
+  <table class="income-report">
+    <thead>
+      <tr>
+        <th>Hesap Kodu ve Adı</th>
+        <th class="right">Tutar</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsFor(['600','601','602','610','611','612'])}
+      <tr style="font-weight:700;background:#fafafa">
+        <td>NET SATIŞLAR</td>
+        <td class="right">${fmt(netSales)}</td>
+      </tr>
+
+      ${costRows}
+      <tr style="font-weight:700;background:#fafafa">
+        <td>BRÜT SATIŞ KARI VEYA ZARARI</td>
+        <td class="right">${fmt(grossProfit)}</td>
+      </tr>
+
+      ${opexRows}
+      <tr style="font-weight:700;background:#fafafa">
+        <td>FAALİYET KARI VEYA ZARARI</td>
+        <td class="right">${fmt(operatingProfit)}</td>
+      </tr>
+
+      ${otherIncRows}
+      ${otherExpRows}
+      <tr style="font-weight:700;background:#fafafa">
+        <td>OLAĞAN KAR VEYA ZARAR</td>
+        <td class="right">${fmt(ordinaryProfit)}</td>
+      </tr>
+
+      ${extraIncRows}
+      ${extraExpRows}
+      <tr style="font-weight:700;background:#fafafa">
+        <td>DÖNEM KARI VEYA ZARARI</td>
+        <td class="right">${fmt(periodProfit)}</td>
+      </tr>
+
+      ${taxRow}
+      <tr style="font-weight:700;background:#eaf2ff">
+        <td>DÖNEM NET KARI VEYA ZARARI</td>
+        <td class="right">${fmt(netPeriodProfit)}</td>
+      </tr>
+    </tbody>
+  </table>`;
+
+}
+
+function makeBalanceSheetReportHTML(){
+  const {from, to} = getReportRange();
+
+  // Başlık adları
+  const NAMES = {
+    '1':'DÖNEN VARLIKLAR','2':'DURAN VARLIKLAR',
+    '3':'KISA VADELİ YABANCI KAYNAKLAR','4':'UZUN VADELİ YABANCI KAYNAKLAR','5':'ÖZKAYNAKLAR',
+    '10':'HAZIR DEĞERLER','11':'MENKUL KIYMETLER','12':'TICARI ALACAKLAR','13':'DIĞER ALACAKLAR',
+    '15':'STOKLAR','17':'YILLARA YAY. İNŞ. VE ONARIM MALIYETLERI','18':'GELECEK AY. AIT GID. VE GELIR TAHAK.','19':'DIĞER DÖNEN VARLIKLAR',
+    '22':'TICARI ALACAKLAR','23':'DIĞER ALACAKLAR','24':'MALI DURAN VARLIKLAR','25':'MADDI DURAN VARLIKLAR',
+    '26':'MADDI OLMAYAN DURAN VARLIKLAR','27':'ÖZEL TÜKENMEYE TABI VARLIKLAR','28':'GEL. YIL. AIT GID. VE GELIR TAHAKKUKLARI','29':'DIĞER DURAN VARLIKLAR',
+    '30':'MALI BORÇLAR','32':'TICARI BORÇLAR','33':'DIĞER BORÇLAR','34':'ALINAN AVANSLAR','35':'YIL. YAY. İNŞ. VE ONARIM HAK. BED.',
+    '36':'ÖDENECEK VERGI VE DIĞER YÜKÜMLÜLÜKLER','37':'BORÇ VE GIDER KARŞILIKLARI','38':'GEL. AYLARA AIT GEL. VE GIDER TAHAK.','39':'DIĞER KISA VADELI YABANCI KAYNAKLAR',
+    '40':'MALI BORÇLAR','42':'TICARI BORÇLAR','43':'DIĞER BORÇLAR','44':'ALINAN AVANSLAR','47':'BORÇ VE GIDER KARŞILIKLARI',
+    '48':'GEL. YIL. AIT GELIRLER VE GIDER TAHAK.','49':'DIĞER UZUN VADELI YABANCI KAYNAKLAR',
+    '50':'ÖDENMIŞ SERMAYE','52':'SERMAYE YEDEKLERI','54':'KAR YEDEKLERI','57':'GEÇMIŞ YILLAR KARLARI',
+    '58':'GEÇMIŞ YILLAR ZARARLARI (-)','59':'DÖNEM NET KARI (ZARARI)'
+  };
+
+  const LEFT_MAINS  = [
+    {code:'1', groups:['10','11','12','13','15','17','18','19']},
+    {code:'2', groups:['22','23','24','25','26','27','28','29']}
+  ];
+  const RIGHT_MAINS = [
+    {code:'3', groups:['30','32','33','34','35','36','37','38','39']},
+    {code:'4', groups:['40','42','43','44','47','48','49']},
+    {code:'5', groups:['50','52','54','57','58','59']}
+  ];
+
+  const inRangeVoucher = (v)=> inRange(parseDateInput(ymd(v.date)), from, to);
+
+  // 1) 1–5 hesapları topla (borç/alacak)
+  const totals = {}; // code -> {db, cr}
+  DB.vouchers.forEach(v=>{
+    if(!inRangeVoucher(v)) return;
+    (v.lines||[]).forEach(ln=>{
+      const code = String(ln.account||'').trim();
+      if(!/^[1-5]\d{2}$/.test(code)) return;
+      if(!totals[code]) totals[code] = {db:0, cr:0};
+      totals[code].db += toNum(ln.debit);
+      totals[code].cr += toNum(ln.credit);
+    });
+  });
+
+  // 2) Bilanço tutarı (işaret)
+  // 1-2: amount = (db - cr)
+  // 3-4-5: amount = -(db - cr)
+  const byGroup = {};
+  Object.keys(totals).forEach(code=>{
+    const diff = totals[code].db - totals[code].cr;
+    const amount = (code[0]==='1' || code[0]==='2') ? diff : -diff;
+    if(Math.abs(amount) < 0.005) return;
+    const g = code.slice(0,2);
+    if(!byGroup[g]) byGroup[g] = {sum:0, accounts:[]};
+    byGroup[g].accounts.push({code, name:getAccName(code), amount});
+    byGroup[g].sum += amount;
+  });
+
+  // 3) 6xx var mı? Varsa Kar/Zarar raporundaki MANTIKLA net kâr/zararı hesapla
+  const net6 = {}; // 6xx için net = (alacak - borç)
+  DB.vouchers.forEach(v=>{
+    if(!inRangeVoucher(v)) return;
+    (v.lines||[]).forEach(ln=>{
+      const code = String(ln.account||'').trim();
+      if(!/^6\d{2}$/.test(code)) return;
+      if(!net6[code]) net6[code] = 0;
+      net6[code] += toNum(ln.credit) - toNum(ln.debit);
+    });
+  });
+
+  const used6 = Object.keys(net6).some(k=> Math.abs(net6[k])>0.005);
+
+  // Kar/Zarar raporundaki aynı gruplandırma
+  const SUM = list => list.reduce((s,c)=> s + (net6[c]||0), 0);
+  const NET_SALES = SUM(['600','601','602','610','611','612']);
+  const COSTS     = SUM(['620','621','622','623']);
+  const GROSS     = NET_SALES + COSTS;
+  const OPEX      = SUM(['630','631','632']);
+  const OPER      = GROSS + OPEX;
+  const OTHER_INC = SUM(['640','641','642','643','644','645','646','647','649']);
+  const OTHER_EXP = SUM(['653','654','655','656','657','659','660','661']);
+  const ORDINARY  = OPER + OTHER_INC + OTHER_EXP;
+  const EXTRA_INC = SUM(['671','679']);
+  const EXTRA_EXP = SUM(['680','681','689']);
+  const PERIOD    = ORDINARY + EXTRA_INC + EXTRA_EXP;
+  const TAX_691   = net6['691'] || 0;
+  const NET_PROFIT = PERIOD + TAX_691; // DÖNEM NET KARI/ ZARARI
+
+  // 6xx kullanılmış ve net ≠ 0 ise: 59 grubuna 590 (+) veya 591 (-) ekle
+  if (used6 && Math.abs(NET_PROFIT) > 0.005){
+    if(!byGroup['59']) byGroup['59'] = {sum:0, accounts:[]};
+
+    // Çifte sayımı önlemek için mevcut 590/591 varsa temizle
+    const g59 = byGroup['59'];
+    for(let i=g59.accounts.length-1;i>=0;i--){
+      const a = g59.accounts[i];
+      if (a.code==='590' || a.code==='591'){
+        g59.sum -= a.amount;
+        g59.accounts.splice(i,1);
+      }
+    }
+
+    if (NET_PROFIT > 0){
+      g59.accounts.push({code:'590', name:getAccName('590'), amount: NET_PROFIT});  // pozitif
+      g59.sum += NET_PROFIT;
+    }else{
+      g59.accounts.push({code:'591', name:getAccName('591'), amount: NET_PROFIT});  // negatif
+      g59.sum += NET_PROFIT;
+    }
+  }
+
+  // 4) Sütunları (Aktif/Pasif) üret
+  function buildColumn(mainList, isLeft){
+    let sideSum = 0;
+    let html = '<table class="bs-col"><tbody>';
+
+    mainList.forEach(main=>{
+      const usedGroups = (main.groups||[]).filter(g=> byGroup[g] && byGroup[g].accounts.length);
+      if(!usedGroups.length) return;
+
+      const mainSum = usedGroups.reduce((s,g)=> s + byGroup[g].sum, 0);
+      sideSum += mainSum;
+
+      html += `<tr class="main">
+        <td><span class="code">${main.code}</span> ${escapeHTML(NAMES[main.code]||'')}</td>
+        <td class="right bold">${fmt(mainSum)}</td>
+      </tr>`;
+
+      usedGroups.forEach(g=>{
+        const gData = byGroup[g];
+        html += `<tr class="group">
+          <td><span class="code">${g}</span> ${escapeHTML(NAMES[g]||'')}</td>
+          <td class="right group-total">${fmt(gData.sum)}</td>
+        </tr>`;
+
+        gData.accounts.sort((a,b)=> a.code.localeCompare(b.code)).forEach(a=>{
+          html += `<tr class="acc">
+            <td>${escapeHTML(a.code)}. ${escapeHTML(a.name||'')}</td>
+            <td class="right">${fmt(a.amount)}</td>
+          </tr>`;
+        });
+      });
+    });
+
+    const totalLabel = isLeft ? '1VT VARLIK (AKTİF) TOPLAM' : '5KT KAYNAKLAR (PASİF) TOPLAMI';
+    html += `<tr class="grand">
+      <td>${totalLabel}</td>
+      <td class="right bold">${fmt(sideSum)}</td>
+    </tr>`;
+
+    html += '</tbody></table>';
+    return {html, total: sideSum};
+  }
+
+  const left  = buildColumn(LEFT_MAINS,  true);
+  const right = buildColumn(RIGHT_MAINS, false);
+
+  // Tarih aralığı başlık metni
+  const toDMY = d => d ? dmyFromISO(ymd(d)) : '';
+  const rangeText = (from||to) ? ` (${toDMY(from)} – ${toDMY(to)})` : '';
+
+  // 5) Stil ve çıktı
+  const style = `
+  <style>
+    .bs-title{ background:#0f766e; color:#fff; text-align:center; padding:10px 14px; border-radius:8px; font-weight:800; letter-spacing:.5px; margin:0 0 10px 0; font-size:20px;}
+    .bs-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+    table.bs-col{ width:100%; border-collapse:collapse; table-layout:fixed; }
+    table.bs-col td{ border:1px solid #e5e7eb; padding:6px 8px; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    table.bs-col td:last-child{ width:140px; font-variant-numeric: tabular-nums lining-nums; }
+    .right{text-align:right}
+    .bold{font-weight:700}
+    .main td{ background:#f3f4f6; font-weight:700 }
+    .group td:first-child{ color:#1d4ed8; font-weight:700 }
+    .group-total{ color:#1d4ed8; font-weight:700 }
+    .grand td{ background:#e5e7eb; font-weight:800 }
+    .code{ display:inline-block; min-width:26px; font-weight:800; color:#374151; margin-right:6px; }
+    @media print {.bs-title{margin-top:6px}}
+  </style>`;
+
+  return `
+    ${style}
+    <div class="bs-title">DÖNEM SONU BİLANÇO${escapeHTML(rangeText)}</div>
+    <div class="bs-grid">
+      <section>${left.html}</section>
+      <section>${right.html}</section>
+    </div>
+  `;
+}
+function makeStockReportHTML(){
+  const {from, to} = getReportRange();
+  const inRangeVoucher = (v)=> inRange(parseDateInput(ymd(v.date)), from, to);
+  const sortFn = (a,b)=> Number(a.no)-Number(b.no) || a.isoDate.localeCompare(b.isoDate);
+
+  // --- 1) Ham veriyi topla: 153 BORÇ (alış), 600 ALACAK (satış) ---
+  const purchases = []; // {no, isoDate, qty, amount}
+  const sales     = []; // {no, isoDate, qty, amount}
+
+  DB.vouchers.forEach(v=>{
+    if(!inRangeVoucher(v)) return;
+    (v.lines||[]).forEach(ln=>{
+      const acc = String(ln.account||'');
+      const qty = toNum(ln.quantity);
+
+      if (acc === '153'){ // ALIŞ
+        const amount = toNum(ln.debit);
+        if (amount > 0){
+          purchases.push({ no: v.no, isoDate: ymd(v.date), qty, amount });
+        }
+      }
+      if (acc === '600'){ // SATIŞ
+        const amount = toNum(ln.credit);
+        if (amount > 0){
+          sales.push({ no: v.no, isoDate: ymd(v.date), qty, amount });
+        }
+      }
+    });
+  });
+
+  purchases.sort(sortFn);
+  sales.sort(sortFn);
+
+  // --- 2) Alış/Satış tabloları (mevcut görünüm) ---
+  const makeRows = (arr)=> (arr.length ? arr.map(it=>{
+    const q = Math.max(0, toNum(it.qty));
+    const a = toNum(it.amount);
+    const price = (q>0) ? a/q : 0;
+    return `<tr>
+      <td>${escapeHTML(String(it.no))}</td>
+      <td>${escapeHTML(dmyFromISO(it.isoDate))}</td>
+      <td class="right">${fmtNoZero(q)}</td>
+      <td class="right">${q>0 ? fmt(price) : ''}</td>
+      <td class="right">${fmtNoZero(a)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5">Kayıt bulunamadı.</td></tr>');
+
+  const sum = (arr)=> arr.reduce((s,it)=>({ qty: s.qty + Math.max(0,toNum(it.qty)), amt: s.amt + toNum(it.amount) }), {qty:0, amt:0});
+  const pTot = sum(purchases);
+  const sTot = sum(sales);
+  const soldQty = sTot.qty;
+
+  const purchasesTable = `
+    <h3>153. TİCARİ MAL ALIŞLARI</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:70px">Fiş No</th>
+          <th style="width:90px">Tarih</th>
+          <th class="right" style="width:110px">Miktar</th>
+          <th class="right" style="width:110px">Fiyat</th>
+          <th class="right" style="width:120px">Tutar</th>
+        </tr>
+      </thead>
+      <tbody>${makeRows(purchases)}</tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2" class="right">TOPLAM</th>
+          <th class="right">${fmtNoZero(pTot.qty)}</th>
+          <th></th>
+          <th class="right">${fmtNoZero(pTot.amt)}</th>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  const salesTable = `
+    <h3>600.YURT İÇİ SATIŞLAR</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:70px">Fiş No</th>
+          <th style="width:90px">Tarih</th>
+          <th class="right" style="width:110px">Miktar</th>
+          <th class="right" style="width:110px">Fiyat</th>
+          <th class="right" style="width:120px">Tutar</th>
+        </tr>
+      </thead>
+      <tbody>${makeRows(sales)}</tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2" class="right">TOPLAM</th>
+          <th class="right">${fmtNoZero(sTot.qty)}</th>
+          <th></th>
+          <th class="right">${fmtNoZero(sTot.amt)}</th>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  // --- 3) Lotlar: tarih EŞİTSE fiş no/indeksle bağlaçlı sırala ---
+  const purchaseLotsAsc = purchases
+    .filter(it => toNum(it.qty) > 0 && toNum(it.amount) > 0)
+    .map((it, idx) => ({
+      date: it.isoDate,
+      qty : toNum(it.qty),
+      unit: toNum(it.amount)/toNum(it.qty),
+      no  : Number(it.no) || 0,  // ← bağlaç
+      _idx: idx                  // ← emniyet bağı
+    }))
+    // en eski -> en yeni (tarih eşitse fiş no küçük -> büyük, o da eşitse indeks)
+    .sort((a,b)=> a.date.localeCompare(b.date) || a.no - b.no || a._idx - b._idx);
+
+  const cloneLots = lots => lots.map(l=>({date:l.date, qty:l.qty, unit:l.unit, no:l.no, _idx:l._idx}));
+
+  function endingByFIFO(){
+    const lots = cloneLots(purchaseLotsAsc);
+    let need = Math.max(0, soldQty);
+    for(let i=0; i<lots.length && need>0; i++){
+      const take = Math.min(lots[i].qty, need);
+      lots[i].qty -= take;
+      need -= take;
+    }
+    return lots.filter(l=>l.qty>0).map(l=>({
+      date:l.date, qty:l.qty, unit:l.unit, amount:l.qty*l.unit, no:l.no, _idx:l._idx
+    }));
+  }
+
+  function endingByLIFO(){
+    const lots = cloneLots(purchaseLotsAsc);
+    let need = Math.max(0, soldQty);
+    for(let i=lots.length-1; i>=0 && need>0; i--){
+      const take = Math.min(lots[i].qty, need);
+      lots[i].qty -= take;
+      need -= take;
+    }
+    return lots.filter(l=>l.qty>0).map(l=>({
+      date:l.date, qty:l.qty, unit:l.unit, amount:l.qty*l.unit, no:l.no, _idx:l._idx
+    }));
+  }
+
+  const fifoLayersRaw = endingByFIFO();
+  const lifoLayersRaw = endingByLIFO();
+
+  // --- 4) Ekran sırası ---
+  // FIFO: YENİ -> ESKİ (son alış EN ÜSTE değil; EN SONDA istiyorsanız bu satırı ESKİ->YENİ yapmayın,
+  // biz kısmi lotu (en eski kalan) en sonda istiyoruz; bu yüzden yeni->eski gösteriyoruz.)
+  const fifoLayers = fifoLayersRaw.slice()
+    .sort((a,b)=> b.date.localeCompare(a.date) || b.no - a.no || b._idx - a._idx);
+
+  // LIFO: Değişmedi (eski -> yeni)
+  const lifoLayers = lifoLayersRaw.slice()
+    .sort((a,b)=> a.date.localeCompare(b.date) || a.no - b.no || a._idx - b._idx);
+
+  const sumLayers = layers => layers.reduce((s,l)=>({ qty: s.qty + l.qty, amt: s.amt + l.amount }), {qty:0, amt:0});
+  const fifoEnd = sumLayers(fifoLayers);
+  const lifoEnd = sumLayers(lifoLayers);
+
+  // Ağırlıklı Ortalama
+  const aomPrice  = pTot.qty > 0 ? (pTot.amt / pTot.qty) : 0;
+  const aomQty    = Math.max(0, pTot.qty - soldQty);
+  const aomAmount = aomQty * aomPrice;
+
+  // --- 5) Kalan stok tabloları ---
+  const fifoTable = `
+    <h3>KALAN STOKLAR FIFO Yöntemi İle:</h3>
+    <table>
+      <thead>
+        <tr>
+          <th class="right" style="width:120px">Miktar</th>
+          <th class="right" style="width:110px">Fiyat</th>
+          <th class="right" style="width:120px">Tutar</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${fifoLayers.length ? fifoLayers.map(l=>`
+          <tr>
+            <td class="right">${fmtNoZero(l.qty)}</td>
+            <td class="right">${fmt(l.unit)}</td>
+            <td class="right">${fmtNoZero(l.amount)}</td>
+          </tr>`).join('') : '<tr><td colspan="3">Kalan stok yok.</td></tr>'}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="right">${fmtNoZero(fifoEnd.qty)}</th>
+          <th></th>
+          <th class="right">${fmtNoZero(fifoEnd.amt)}</th>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  const lifoTable = `
+    <h3>KALAN STOKLAR LIFO Yöntemi İle:</h3>
+    <table>
+      <thead>
+        <tr>
+          <th class="right" style="width:120px">Miktar</th>
+          <th class="right" style="width:110px">Fiyat(lar)</th>
+          <th class="right" style="width:120px">Tutar</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lifoLayers.length ? lifoLayers.map(l=>`
+          <tr>
+            <td class="right">${fmtNoZero(l.qty)}</td>
+            <td class="right">${fmt(l.unit)}</td>
+            <td class="right">${fmtNoZero(l.amount)}</td>
+          </tr>`).join('') : '<tr><td colspan="3">Kalan stok yok.</td></tr>'}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="right">${fmtNoZero(lifoEnd.qty)}</th>
+          <th></th>
+          <th class="right">${fmtNoZero(lifoEnd.amt)}</th>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  const aomTable = `
+    <h3>KALAN STOKLAR Ağırlıklı Ortalama Maliyet (AOM) Yöntemi ile:</h3>
+    <table>
+      <thead>
+        <tr>
+          <th class="right" style="width:120px">Miktar</th>
+          <th class="right" style="width:110px">Fiyat</th>
+          <th class="right" style="width:120px">Tutar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="right">${fmtNoZero(aomQty)}</td>
+          <td class="right">${fmt(aomPrice)}</td>
+          <td class="right">${fmtNoZero(aomAmount)}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="right">${fmtNoZero(aomQty)}</th>
+          <th></th>
+          <th class="right">${fmtNoZero(aomAmount)}</th>
+        </tr>
+      </tfoot>
+    </table>`;
+
+// --- 6) SMM (bildiğiniz gibi) ---
+const smmFIFO = pTot.amt - fifoEnd.amt;
+const smmLIFO = pTot.amt - lifoEnd.amt;
+const smmAOM  = pTot.amt - aomAmount;
+
+const smmBlock = `
+  <h3>SMM RAPORU</h3>
+  <div class="muted" style="margin:6px 0 10px 0">SMM = Toplam Alış - Dönem Sonu Stok (Kalan)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Yöntem</th>
+        <th class="right" style="width:150px">Toplam Alış Tutarı</th>
+        <th class="right" style="width:150px">Dönem Sonu Stok</th>
+        <th class="right" style="width:150px">SMM</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SMM (FIFO) Yöntemi ile</td>
+        <td class="right">${fmtNoZero(pTot.amt)}</td>
+        <td class="right">${fmtNoZero(fifoEnd.amt)}</td>
+        <td class="right">${fmtNoZero(smmFIFO)}</td>
+      </tr>
+      <tr>
+        <td>SMM (LIFO) Yöntemi ile</td>
+        <td class="right">${fmtNoZero(pTot.amt)}</td>
+        <td class="right">${fmtNoZero(lifoEnd.amt)}</td>
+        <td class="right">${fmtNoZero(smmLIFO)}</td>
+      </tr>
+      <tr>
+        <td>SMM (AOM) Yöntemi ile</td>
+        <td class="right">${fmtNoZero(pTot.amt)}</td>
+        <td class="right">${fmtNoZero(aomAmount)}</td>
+        <td class="right">${fmtNoZero(smmAOM)}</td>
+      </tr>
+    </tbody>
+  </table>`;
+
+// --- 6b) BRÜT KAR (Satışlar - SMM) ---
+const grossFIFO = sTot.amt - smmFIFO;
+const grossLIFO = sTot.amt - smmLIFO;
+const grossAOM  = sTot.amt - smmAOM;
+
+const grossBlock = `
+  <h3>BRÜT KAR RAPORU (Satışlar - SMM)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Yöntem</th>
+        <th class="right" style="width:150px">Satış Tutarı</th>
+        <th class="right" style="width:150px">SMM</th>
+        <th class="right" style="width:150px">Brüt Kar</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Brüt Kar (FIFO) Yöntemi ile</td>
+        <td class="right">${fmtNoZero(sTot.amt)}</td>
+        <td class="right">${fmtNoZero(smmFIFO)}</td>
+        <td class="right">${fmtNoZero(grossFIFO)}</td>
+      </tr>
+      <tr>
+        <td>Brüt Kar (LIFO) Yöntemi ile</td>
+        <td class="right">${fmtNoZero(sTot.amt)}</td>
+        <td class="right">${fmtNoZero(smmLIFO)}</td>
+        <td class="right">${fmtNoZero(grossLIFO)}</td>
+      </tr>
+      <tr>
+        <td>Brüt Kar (AOM) Yöntemi ile</td>
+        <td class="right">${fmtNoZero(sTot.amt)}</td>
+        <td class="right">${fmtNoZero(smmAOM)}</td>
+        <td class="right">${fmtNoZero(grossAOM)}</td>
+      </tr>
+    </tbody>
+  </table>`;
+
+return `
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:16px; align-items:start">
+    <section>${purchasesTable}</section>
+    <section>${salesTable}</section>
+  </div>
+
+  <h2 style="margin-top:14px">Kalan Stoklar</h2>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; align-items:start">
+    <section>${fifoTable}</section>
+    <section>${lifoTable}</section>
+    <section>${aomTable}</section>
+  </div>
+
+  <div style="margin-top:14px">${smmBlock}</div>
+  <div style="margin-top:10px">${grossBlock}</div>
+`;
+}
 
 function makeVoucherPrintHTML(){
   const sel=document.getElementById('v_select');
@@ -1683,7 +2464,6 @@ function makeVoucherPrintHTML(){
     const accName = getAccName(ln.account);
     const baseAcc = `${escapeHTML(String(ln.account||''))}.${escapeHTML(accName)}`;
 
-    // Sadece ALACAK yazılan satırları içerden başlat
     const isCredit = toNum(ln.credit) > 0 && toNum(ln.debit) === 0;
     const accCell  = (isCredit ? INDENT : '') + baseAcc;
 
@@ -1691,12 +2471,14 @@ function makeVoucherPrintHTML(){
       <td>${accCell}</td>
       <td class="right">${fmtNoZero(toNum(ln.debit))}</td>
       <td class="right">${fmtNoZero(toNum(ln.credit))}</td>
+      <td class="right">${fmtNoZero(toNum(ln.quantity))}</td>
       <td class="desc-col">${escapeHTML(ln.desc||'')}</td>
     </tr>`;
   }).join('');
 
   const td = (v.lines||[]).reduce((s,x)=>s+toNum(x.debit),0);
   const tc = (v.lines||[]).reduce((s,x)=>s+toNum(x.credit),0);
+  const tq = (v.lines||[]).reduce((s,x)=>s+toNum(x.quantity),0);
 
   return `
     <div><b>Tarih:</b> ${escapeHTML(dmyFromISO(v.date))} &nbsp; <b>Fiş No:</b> ${escapeHTML(String(v.no||''))}</div>
@@ -1706,14 +2488,16 @@ function makeVoucherPrintHTML(){
         <th style="width:200px">Hesap Kodu & Adı</th>
         <th class="right" style="width:110px">Borç</th>
         <th class="right" style="width:110px">Alacak</th>
+        <th class="right" style="width:110px">Miktar</th>
         <th class="desc-col">Açıklama</th>
       </tr></thead>
-      <tbody>${lines || '<tr><td colspan="4">Satır yok.</td></tr>'}</tbody>
+      <tbody>${lines || '<tr><td colspan="5">Satır yok.</td></tr>'}</tbody>
       <tfoot>
         <tr>
           <th class="right">TOPLAM</th>
           <th class="right">${fmtNoZero(td)}</th>
           <th class="right">${fmtNoZero(tc)}</th>
+          <th class="right">${fmtNoZero(tq)}</th>
           <th></th>
         </tr>
       </tfoot>
@@ -1739,8 +2523,19 @@ function makeVoucherPrintHTML(){
 
     document.getElementById('rpJournal2').addEventListener('click', ()=>{
       openReportInNewTab('Yevmiye Dökümü 2', makeJournalReport2HTML());
-});
+    });
 
+    document.getElementById('rpStock').addEventListener('click', ()=>{
+      openReportInNewTab('Stok Raporu', makeStockReportHTML());
+    });
+
+    document.getElementById('rpIncome').addEventListener('click', ()=>{
+    openReportInNewTab('Kar/Zarar Raporu', makeIncomeReportHTML());
+    });
+
+    document.getElementById('rpBalance').addEventListener('click', ()=>{
+  openReportInNewTab('Bilanço', makeBalanceSheetReportHTML());
+    });
   }
 
   // ---------- Veri Yönetimi ----------
@@ -1768,14 +2563,14 @@ function makeVoucherPrintHTML(){
   }
 
   function exportTSV(){
-    const headers = ['Tarih','FişNo','FişAçıklaması','HesapKodu','Borç','Alacak','Açıklama'];
+    const headers = ['Tarih','FişNo','FişAçıklaması','HesapKodu','Borç','Alacak','Miktar','Açıklama'];
     const rows = [headers.join('\t')];
     DB.vouchers.forEach(v=>{
       const tarih = dmyFromISO(v.date);
       const fisNo = v.no ?? '';
       const fisAc = v.desc ?? '';
       (v.lines||[]).forEach(ln=>{
-        rows.push([tarih,fisNo,fisAc,ln.account||'',fmt(toNum(ln.debit)),fmt(toNum(ln.credit)),ln.desc||''].join('\t'));
+        rows.push([tarih,fisNo,fisAc,ln.account||'',fmt(toNum(ln.debit)),fmt(toNum(ln.credit)),fmt(toNum(ln.quantity)),ln.desc||''].join('\t'));
       });
     });
     const tsv = '\uFEFF' + rows.join('\n');
@@ -1814,6 +2609,7 @@ function makeVoucherPrintHTML(){
           hesap:  headers.findIndex(h=>h.includes('hesap') && h.includes('kodu')),
           borc:   headers.findIndex(h=>h.startsWith('borc')),
           alacak: headers.findIndex(h=>h.startsWith('alacak')),
+          miktar: headers.findIndex(h=>h.startsWith('miktar')),
           acik:   headers.findIndex(h=>h==='aciklama' || h.endsWith('aciklama')),
         };
         ['tarih','fisno','hesap','borc','alacak'].forEach(k=>{ if(idx[k]===-1) throw new Error(`Başlık eksik veya farklı: ${k}`); });
@@ -1832,6 +2628,7 @@ function makeVoucherPrintHTML(){
           const hesap= unquote(parts[idx.hesap] ?? '').toString().trim();
           const borc = toNum(unquote(parts[idx.borc]));
           const alac = toNum(unquote(parts[idx.alacak]));
+          const miktar = idx.miktar > -1 ? toNum(unquote(parts[idx.miktar])) : 0;
           const satA = idx.acik>-1 ? unquote(parts[idx.acik] ?? '').toString().trim() : '';
 
           if(!hesap || !(borc>0 || alac>0)) continue;
@@ -1840,7 +2637,7 @@ function makeVoucherPrintHTML(){
           if(!groups.has(key)) groups.set(key, {date: iso, no: no, desc: fAc, lines: []});
           const obj = groups.get(key);
           if(!obj.desc && fAc) obj.desc = fAc;
-          obj.lines.push({ account:hesap, debit: borc>0?borc:0, credit: alac>0?alac:0, desc:satA });
+          obj.lines.push({ account:hesap, debit: borc>0?borc:0, credit: alac>0?alac:0, quantity: miktar, desc:satA });
         }
 
         let ok=0, fail=0, errs=[];
@@ -2017,7 +2814,7 @@ function makeVoucherPrintHTML(){
       if (drV===0 && crV===0){
         if (!accSel.value) accSel.value = preferredAcc;
         if(needCredit){ crEl.value = amountStr; drEl.value = ''; }
-        else          { drEl.value = amountStr; crEl.value = ''; }
+        else         { drEl.value = amountStr; crEl.value = ''; }
         if (accSel.value) LAST_USED_ACCOUNT = accSel.value;
         markDirty();
         recalcVoucherTotals();
@@ -2046,7 +2843,7 @@ function makeVoucherPrintHTML(){
     const crEl = targetRow.children[2].querySelector('input');
 
     if(needCredit){ crEl.value = amountStr; drEl.value = ''; }
-    else          { drEl.value = amountStr; crEl.value = ''; }
+    else         { drEl.value = amountStr; crEl.value = ''; }
 
     markDirty();
     recalcVoucherTotals();
