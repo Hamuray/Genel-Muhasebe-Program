@@ -14,10 +14,17 @@
     legend{padding:0 6px; font-weight:700; display:flex; align-items:center; gap:8px;}
     label{display:block; font-weight:600; margin:6px 0}
     input[type="text"],input[type="date"],select,button{border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:14px; background:white}
+    #v_select{width:500px; max-width:50vw; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+    .voucher-select-header{display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;}
+    .voucher-select-header > label{margin:0;}
+    .voucher-select-header button{flex:0 0 auto; padding:6px 12px;}
     button{cursor:pointer}
     button.primary{background:var(--brand); color:#fff; border-color:#000; box-shadow:0 1px 0 rgba(0,0,0,.08)}
     button:disabled{opacity:.55; cursor:not-allowed}
     .row{display:flex; gap:12px; flex-wrap:wrap}
+    .row-align-end{align-items:flex-end}
+    .row-nowrap{flex-wrap:nowrap}
+    .row-nowrap > div{flex:0 0 auto}
     .row > div{flex:1 1 180px}
     table{width:100%; border-collapse:collapse; margin-top:10px; background:white; border-radius:10px; overflow:hidden}
     th,td{border:1px solid var(--line); padding:6px 8px; font-size:13px; text-align:left;}
@@ -31,6 +38,14 @@
     .warn{ background:#fff1f2; }
     .warn td{ color:#991b1b; }
     input[readonly]{ background:#f3f4f6; color:#6b7280; }
+
+    /* Fiş toplam hücreleri için durum renkleri */
+    .total-sum{ transition:background-color .2s ease; }
+    .total-sum.pending{ background:#fef3c7; }  /* açık turuncu */
+    .total-sum.balanced{ background:#dcfce7; } /* açık yeşil */
+    #v_save{ transition:background-color .2s ease, color .2s ease, border-color .2s ease; }
+    #v_save.pending{ background:#fef3c7; color:#78350f; border-color:#fcd34d; }
+    #v_save.balanced{ background:#dcfce7; color:#047857; border-color:#6ee7b7; }
 
 /* --- TABLO HİZALAMA DÜZELTMELERİ --- */
 
@@ -193,12 +208,16 @@ fieldset.readonly {
         </div>
       </div>
 
-      <div class="row" style="margin-top:8px">
-        <div style="flex:2">
-          <label for="v_select">Kayıtlı Fişler</label>
-          <select id="v_select" style="min-width:320px"></select>
+      <div class="row row-nowrap row-align-end" style="margin-top:8px">
+        <div style="flex:0 0 auto">
+          <div class="voucher-select-header">
+            <label for="v_select">Kayıtlı Fişler</label>
+            <button type="button" id="v_sort_date" class="primary">Tarih Sıralı</button>
+            <button type="button" id="v_sort_no">Fiş No Sıralı</button>
+          </div>
+          <select id="v_select"></select>
         </div>
-        <div class="toolbar" style="align-self:end; margin-left:auto; display:flex; gap:8px">
+        <div class="toolbar" style="align-self:end; display:flex; gap:8px; margin-left:auto; justify-content:flex-end">
           <button id="v_load">Yükle</button>
           <button id="v_edit" class="primary" title="Bu fişi düzenlemeye aç">Fişi Güncelle</button>
           <button id="v_prev" title="Listedeki bir önceki fişi yükle">← Önceki Fiş</button>
@@ -225,8 +244,8 @@ fieldset.readonly {
         <tfoot>
           <tr>
             <th class="right">TOPLAM</th>
-            <th id="v_tdb" class="right">0,00</th>
-            <th id="v_tcr" class="right">0,00</th>
+            <th id="v_tdb" class="right total-sum">0,00</th>
+            <th id="v_tcr" class="right total-sum">0,00</th>
             <th id="v_tqty" class="right">0,00</th>
             <th colspan="4"></th>
           </tr>
@@ -237,16 +256,17 @@ fieldset.readonly {
         <div style="display:flex; gap:8px">
           <button id="v_balance">Kalanı Dengele</button>
           <button id="v_save" class="primary" disabled>Kaydet</button>
+          <button id="rpVoucher">Fişi Yazdır</button>
           <span id="v_msg" class="muted" role="status" aria-live="polite"></span>
         </div>
 
         <div style="display:flex; gap:8px">
           <button id="v_new">Yeni</button>
           <button id="v_delete" class="danger">Sil</button>
-          <button id="btnPurchaseInv">Alış Faturası</button>
-          <button id="btnSalesInv">Satış Faturası</button>
           <select id="tplSelect" title="Şablonlar">
             <option value="">(Şablon seçin)</option>
+            <option value="alis">Alış Faturası</option>
+            <option value="satis">Satış Faturası</option>
             <option value="gider">Gider Faturası</option>
             <option value="tahsil">Müşteriden Tahsilat</option>
             <option value="odeme">Satıcıya Ödeme</option>
@@ -255,6 +275,7 @@ fieldset.readonly {
             <option value="banka2kasa">Bankadan Kasaya</option>
             <option value="smm">Satılan Mal Maliyeti</option>
             <option value="ucret">Ücret Hakedişi</option>
+            <option value="yansitma">Yansıtma Kaydı</option>
 
           </select>
         </div>
@@ -344,17 +365,21 @@ fieldset.readonly {
             <label for="rpTo">Bitiş</label>
             <input type="date" id="rpTo" />
           </div>
-          <div style="flex:2">
-            <label for="rpAccount">Hesap (Ekstre)</label>
-            <select id="rpAccount"></select>
+          <div style="flex:2; display:flex; flex-direction:column">
+            <label for="rpAccount">Hesap</label>
+            <div style="display:flex; gap:8px; align-items:flex-end">
+              <select id="rpAccount" style="flex:1"></select>
+              <button id="rpLedger" style="white-space:nowrap; flex:0 0 auto;">Hesap Ekstresi</button>
+            </div>
           </div>
         </div>
         <div class="toolbar" style="margin-top:8px">
-          <button id="rpJournal">Yevmiye Dökümü</button>
-          <button id="rpLedger">Hesap Ekstresi</button>
+          <select id="rpJournalSelect">
+            <option value="" selected>Yevmiye Dökümü</option>
+            <option value="journal1">Yevmiye 1</option>
+            <option value="journal2">Yevmiye 2</option>
+          </select>
           <button id="rpTrial">Mizan Raporu</button>
-          <button id="rpVoucher">Seçili Fiş Baskısı</button>
-          <button id="rpJournal2">Yevmiye Dökümü 2</button>
           <button id="rpStock">Stok Raporu</button>
           <button id="rpIncome">Kar/Zarar Raporu</button>
           <button id="rpBalance">Bilanço</button>
@@ -395,6 +420,8 @@ fieldset.readonly {
   // --- Kaydet mesajı kontrolü ve "dirty" takibi ---
   let FORM_DIRTY = false;
   let READONLY_MODE = false; // pasif fişte true
+  let CURRENT_VOUCHER_ORIGINAL_KEY = null; // ymd(no) anahtarı, düzenlemede orijinal fişi takip eder
+  let VOUCHER_SORT_MODE = 'date';
   function setSavedMessage(visible){
     const msg = document.getElementById('v_msg');
     msg.textContent = visible ? '✔ Kaydedildi' : '';
@@ -769,6 +796,90 @@ function randomThousandBetween(min=10000, max=50000){
   return k * 1000;
 }
 
+const YANSITMA_DEFAULT_TOLERANCE = 0.01;
+
+function prepareYansitmaTemplate(opts = {}){
+  const tolerance = (typeof opts.tolerans === 'number' && isFinite(opts.tolerans))
+    ? Math.abs(opts.tolerans)
+    : YANSITMA_DEFAULT_TOLERANCE;
+
+  const pairs = [
+    {expense:'760', reflection:'761', resultDebit:'631'},
+    {expense:'770', reflection:'771', resultDebit:'632'},
+    {expense:'780', reflection:'781', resultDebit:'660'}
+  ];
+
+  const requiredCodes = new Set(['631','632','660']);
+  pairs.forEach(p=>{
+    requiredCodes.add(p.expense);
+    requiredCodes.add(p.reflection);
+  });
+
+  const missing = [...requiredCodes].filter(code => !ACCOUNTS.some(a => a.code === code));
+  if (missing.length){
+    return { ok:false, message:`eksik hesap: ${missing.join(', ')}` };
+  }
+
+  const totals = {};
+  DB.vouchers.forEach(v => {
+    (v.lines || []).forEach(ln => {
+      const code = String(ln.account || '').trim();
+      if (!requiredCodes.has(code)) return;
+      if (!totals[code]) totals[code] = {debit:0, credit:0};
+      totals[code].debit  += toNum(ln.debit);
+      totals[code].credit += toNum(ln.credit);
+    });
+  });
+
+  const round2 = (value) => Math.round((value || 0) * 100) / 100;
+  const approxZero = (value) => Math.abs(value) < tolerance;
+
+  let allExpensesZero = true;
+  const positiveDiffs = [];
+
+  for (const pair of pairs){
+    const expTotals = totals[pair.expense] || {debit:0, credit:0};
+    const reflTotals = totals[pair.reflection] || {debit:0, credit:0};
+
+    const expNet = expTotals.debit - expTotals.credit;
+    if (expNet < -tolerance){
+      return { ok:false, message:'gider hesaplarınızı kontrol edin' };
+    }
+
+    const expDebit = expNet > 0 ? round2(expNet) : 0;
+    if (!approxZero(expDebit)) allExpensesZero = false;
+
+    const reflNetCredit = reflTotals.credit - reflTotals.debit;
+    const reflCredit = reflNetCredit > 0 ? round2(reflNetCredit) : 0;
+
+    let diff = round2(expDebit - reflCredit);
+    if (approxZero(diff)) diff = 0;
+
+    if (diff > 0){
+      positiveDiffs.push({ pair, amount: diff });
+    }
+  }
+
+  if (allExpensesZero){
+    return { ok:false, message:'gider hesapları kullanılmamış' };
+  }
+
+  if (!positiveDiffs.length){
+    return { ok:false, message:'yansıtma gerekmiyor (fark oluşmadı)' };
+  }
+
+  const lines = [];
+  const summaryParts = [];
+  positiveDiffs.forEach(({pair, amount}) => {
+    summaryParts.push(`${pair.expense}-${pair.reflection}`);
+    lines.push({ account: pair.resultDebit, debit: amount, desc: `Yansıtma ${pair.expense}-${pair.reflection}` });
+    lines.push({ account: pair.reflection, credit: amount, desc: `Yansıtma ${pair.expense}-${pair.reflection}` });
+  });
+
+  const description = `Yansıtma - ${summaryParts.join('/')}; oluşan farklar yansıtıldı.`;
+  return { ok:true, message:'yansıtma kaydı oluşturuldu', lines, description };
+}
+
   function getAccName(code){
     return ACCOUNTS.find(a=>a.code===code)?.name || '';
   }
@@ -1045,8 +1156,25 @@ function randomThousandBetween(min=10000, max=50000){
       const qv=toNum(r.children[3].querySelector('input').value);
       td+=dv; tc+=cv; tq+=qv; if (dv>0 || cv>0) active++;
     });
-    document.getElementById('v_tdb').textContent=fmt(td);
-    document.getElementById('v_tcr').textContent=fmt(tc);
+    const tdbEl = document.getElementById('v_tdb');
+    const tcrEl = document.getElementById('v_tcr');
+    tdbEl.textContent = fmt(td);
+    tcrEl.textContent = fmt(tc);
+    const saveBtn = document.getElementById('v_save');
+    [tdbEl, tcrEl, saveBtn].forEach(el=>{
+      el.classList.remove('pending', 'balanced');
+    });
+    if (td > 0 || tc > 0){
+      if (td > 0 && tc > 0 && Math.abs(td - tc) < 0.005){
+        tdbEl.classList.add('balanced');
+        tcrEl.classList.add('balanced');
+        saveBtn.classList.add('balanced');
+      } else {
+        tdbEl.classList.add('pending');
+        tcrEl.classList.add('pending');
+        saveBtn.classList.add('pending');
+      }
+    }
     document.getElementById('v_tqty').textContent=fmt(tq);
     const ok = active>=2 && Math.abs(td-tc)<0.005 && td>0 && tc>0;
     const btn=document.getElementById('v_save');
@@ -1073,7 +1201,7 @@ function setVoucherEditable(isEditable){
   });
 
   // Düzenlemeye etki eden araçlar
-  ['v_balance','v_delete','btnPurchaseInv','btnSalesInv','tplSelect'].forEach(id=>{
+  ['v_balance','v_delete','tplSelect'].forEach(id=>{
     const el = document.getElementById(id);
     if (el) el.disabled = !isEditable;
   });
@@ -1103,6 +1231,7 @@ function setVoucherEditable(isEditable){
     recalcVoucherTotals();
     setVoucherEditable(true); // boş yeni fiş düzenlenebilir olsun
 
+    CURRENT_VOUCHER_ORIGINAL_KEY = null;
     FORM_DIRTY = false;
     setSavedMessage(false);
   }
@@ -1122,8 +1251,18 @@ function setVoucherEditable(isEditable){
 
     const keyNo   = String(v.no);
     const keyDate = ymd(v.date);
-    const i = DB.vouchers.findIndex(x=>String(x.no)===keyNo && ymd(x.date)===keyDate);
-    if(i>=0) DB.vouchers[i]=v; else DB.vouchers.push(v);
+
+    let idx = DB.vouchers.findIndex(x=>String(x.no)===keyNo && ymd(x.date)===keyDate);
+
+    if(idx < 0 && CURRENT_VOUCHER_ORIGINAL_KEY){
+      const [origDate, origNo] = CURRENT_VOUCHER_ORIGINAL_KEY.split('|');
+      if (origDate && origNo){
+        idx = DB.vouchers.findIndex(x=>String(x.no)===String(origNo) && ymd(x.date)===origDate);
+      }
+    }
+
+    if(idx>=0) DB.vouchers[idx]=v; else DB.vouchers.push(v);
+    CURRENT_VOUCHER_ORIGINAL_KEY = keyDate + '|' + keyNo;
     saveDB();
   }
 
@@ -1144,12 +1283,13 @@ function setVoucherEditable(isEditable){
     FORM_DIRTY = false;
     setSavedMessage(true);
     refreshVoucherList();
+    ensureSelectMatchesCurrent();
     renderMizan();
 
     // "Kaydedildi" göründükten 3 sn sonra yeni fişe geç
     setTimeout(() => {
       document.getElementById('v_new').click();
-    }, 3000);
+    }, 1000);
 
   }catch(e){
     msg.textContent = 'Hata: ' + e.message;
@@ -1194,27 +1334,87 @@ function deleteVoucher(){
 
 
   // ---------- Fiş Liste / Yükle ----------
+  function updateVoucherSortButtons(){
+    const btnDate = document.getElementById('v_sort_date');
+    const btnNo = document.getElementById('v_sort_no');
+    if (btnDate) btnDate.classList.toggle('primary', VOUCHER_SORT_MODE === 'date');
+    if (btnNo) btnNo.classList.toggle('primary', VOUCHER_SORT_MODE === 'number');
+  }
+
+  function setVoucherSortMode(mode){
+    if (mode !== 'date' && mode !== 'number') return;
+    if (VOUCHER_SORT_MODE === mode){
+      updateVoucherSortButtons();
+      return;
+    }
+    VOUCHER_SORT_MODE = mode;
+    refreshVoucherList();
+  }
+
   function refreshVoucherList(){
     const sel = document.getElementById('v_select');
+    if (!sel){
+      updateVoucherSortButtons();
+      return;
+    }
+
+    const previousValue = sel.value;
     sel.innerHTML = '';
 
     const list = [...DB.vouchers].sort((a,b)=>{
+      if (VOUCHER_SORT_MODE === 'number'){
+        const an = parseInt(String(a.no).replace(/[^0-9]/g,''),10) || 0;
+        const bn = parseInt(String(b.no).replace(/[^0-9]/g,''),10) || 0;
+        if (bn !== an) return bn - an;
+      }
+
       const da = ymd(a.date), db = ymd(b.date);
       const byDate = db.localeCompare(da);
       if(byDate!==0) return byDate;
+
       const an = parseInt(String(a.no).replace(/[^0-9]/g,''),10) || 0;
       const bn = parseInt(String(b.no).replace(/[^0-9]/g,''),10) || 0;
       return bn - an;
     });
 
+    const uniqueCodes = arr => {
+      const seen = new Set();
+      const ordered = [];
+      arr.forEach(code => {
+        if (seen.has(code)) return;
+        seen.add(code);
+        ordered.push(code);
+      });
+      return ordered;
+    };
+
     list.forEach(v=>{
       const opt = document.createElement('option');
       opt.value = ymd(v.date) + '|' + v.no;
       const td = v.lines.reduce((s,x)=>s+toNum(x.debit),0);
-      const tc = v.lines.reduce((s,x)=>s+toNum(x.credit),0);
-      opt.textContent = `${v.no} — ${dmyFromISO(v.date)}${v.desc ? ' — ' + v.desc : ''} (B:${fmt(td)} / A:${fmt(tc)})`;
+
+      const debitCodes = [];
+      const creditCodes = [];
+      (v.lines || []).forEach(line => {
+        const code = (line.account || '').trim();
+        if (!code) return;
+        if (toNum(line.debit) > 0) debitCodes.push(code);
+        if (toNum(line.credit) > 0) creditCodes.push(code);
+      });
+
+      const debitList = uniqueCodes(debitCodes).join(', ') || '-';
+      const creditList = uniqueCodes(creditCodes).join(', ') || '-';
+      const totalText = fmt(td).replace(',00','');
+
+      opt.textContent = `${v.no} — ${dmyFromISO(v.date)}${v.desc ? ' — ' + v.desc : ''} (B: ${debitList} / A: ${creditList}) (T:${totalText})`;
       sel.appendChild(opt);
     });
+
+    if (previousValue){
+      sel.value = previousValue;
+    }
+
+    updateVoucherSortButtons();
   }
 
   function loadSelectedVoucher(){
@@ -1230,6 +1430,7 @@ function deleteVoucher(){
     if((v.lines||[]).length===0){ addVoucherRow(); addVoucherRow(); }
     recalcVoucherTotals();
 
+    CURRENT_VOUCHER_ORIGINAL_KEY = ymd(v.date) + '|' + String(v.no);
     FORM_DIRTY = false;
     setSavedMessage(false);
     setVoucherEditable(false); // Yüklenen geçmiş fiş pasif gelsin
@@ -2557,8 +2758,15 @@ function makeVoucherPrintHTML(){
 
   function bindReportButtons(){
     populateReportAccountSelect();
-    document.getElementById('rpJournal').addEventListener('click', ()=>{
-      openReportInNewTab('Yevmiye Dökümü', makeJournalReportHTML());
+    const journalSelect = document.getElementById('rpJournalSelect');
+    journalSelect.addEventListener('change', (event)=>{
+      if(event.target.value === 'journal1'){
+        openReportInNewTab('Yevmiye Dökümü', makeJournalReportHTML());
+      }
+      if(event.target.value === 'journal2'){
+        openReportInNewTab('Yevmiye Dökümü 2', makeJournalReport2HTML());
+      }
+      event.target.value = '';
     });
     document.getElementById('rpLedger').addEventListener('click', ()=>{
       const acc = document.getElementById('rpAccount').value;
@@ -2569,10 +2777,6 @@ function makeVoucherPrintHTML(){
     });
     document.getElementById('rpVoucher').addEventListener('click', ()=>{
       openReportInNewTab('Fiş Baskısı', makeVoucherPrintHTML());
-    });
-
-    document.getElementById('rpJournal2').addEventListener('click', ()=>{
-      openReportInNewTab('Yevmiye Dökümü 2', makeJournalReport2HTML());
     });
 
     document.getElementById('rpStock').addEventListener('click', ()=>{
@@ -2968,47 +3172,6 @@ function parseNumberOrZero(s){
     recalcVoucherTotals();
   }
   
-  // ---------- Fatura Kısayolları ----------
-  function createPurchaseInvoice(){
-    const tbody = document.querySelector('#voucherTable tbody');
-    tbody.innerHTML = '';
-    
-    // 50000-100000 arasında son 3 hanesi sıfır olan rastgele sayı üret
-    const randomAmount = Math.floor(Math.random() * 51 + 50) * 1000; // 50000-100000 arası, 1000'in katları
-    
-    // KDV hesapla (%20)
-    const kdvAmount = randomAmount * 0.2;
-    
-    // Toplam tutar
-    const totalAmount = randomAmount + kdvAmount;
-    
-    // Satırları ekle
-    const qtyPurchase = Math.floor(Math.random() * 21) + 100; // 100–120 (dahil)
-    addVoucherRow({ 
-        account: '153', 
-        debit: randomAmount,
-        quantity: qtyPurchase,           // ← Miktar burada
-        desc: 'mal alış faturası'
-    });
-    addVoucherRow({ 
-        account: '191', 
-        debit: kdvAmount,
-        desc: 'mal alış faturası KDV'
-    });
-    addVoucherRow({ 
-        account: '320', 
-        credit: totalAmount,
-        desc: 'mal alış faturası toplam'
-    });
-
-    
-    document.getElementById('v_desc').value = 'Alış Faturası';
-    markDirty();
-    recalcVoucherTotals();
-    const firstInput = tbody.querySelector('tr:first-child input.right');
-    if(firstInput) firstInput.focus();
-}
-
 // ---------- ŞABLONLAR (Dropdown) ----------
 function applyTemplateByKey(key){
   // Pasif fişte çalışmasın
@@ -3019,9 +3182,60 @@ function applyTemplateByKey(key){
   }
 
   const tbody = document.querySelector('#voucherTable tbody');
+
+  if (key === 'yansitma'){
+    const sel = document.getElementById('tplSelect');
+    const msgEl = document.getElementById('v_msg');
+    const result = prepareYansitmaTemplate();
+
+    if (!result.ok){
+      if (msgEl) msgEl.textContent = result.message || '';
+      if (result.message) alert(result.message);
+      if (sel) sel.value = '';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    result.lines.forEach(line => addVoucherRow(line));
+    document.getElementById('v_desc').value = result.description;
+
+    markDirty();
+    recalcVoucherTotals();
+
+    const firstRow = tbody.querySelector('tr:first-child select, tr:first-child input');
+    if(firstRow){ firstRow.focus(); }
+
+    if (msgEl) msgEl.textContent = result.message;
+    if (sel) sel.value = '';
+    return;
+  }
   tbody.innerHTML = '';
 
-  if (key === 'gider'){
+  if (key === 'alis'){
+    const randomAmount = randomThousandBetween(50000, 100000);
+    const kdvAmount = randomAmount * 0.20;
+    const totalAmount = randomAmount + kdvAmount;
+    const qtyPurchase = Math.floor(Math.random() * 21) + 100; // 100–120
+
+    addVoucherRow({ account: '153', debit: randomAmount, quantity: qtyPurchase, desc: 'mal alış faturası' });
+    addVoucherRow({ account: '191', debit: kdvAmount, desc: 'mal alış faturası KDV' });
+    addVoucherRow({ account: '320', credit: totalAmount, desc: 'mal alış faturası toplam' });
+
+    document.getElementById('v_desc').value = 'Alış Faturası';
+  }
+  else if (key === 'satis'){
+    const randomAmount = randomThousandBetween(50000, 100000);
+    const kdvAmount = randomAmount * 0.20;
+    const totalAmount = randomAmount + kdvAmount;
+    const qtySales = Math.floor(Math.random() * 21) + 80; // 80–100
+
+    addVoucherRow({ account: '120', debit: totalAmount, desc: 'satış faturası toplam' });
+    addVoucherRow({ account: '600', credit: randomAmount, quantity: qtySales, desc: 'satış faturası' });
+    addVoucherRow({ account: '391', credit: kdvAmount, desc: 'satış faturası KDV' });
+
+    document.getElementById('v_desc').value = 'Satış Faturası';
+  }
+  else if (key === 'gider'){
     // Gider Faturası
     const base = randomThousandBetween(10000, 50000); // 10.000–50.000, 1000'in katı
     const kdv  = base * 0.20;
@@ -3109,47 +3323,6 @@ function applyTemplateByKey(key){
   if (sel) sel.value = '';
 }
 
-
-
-  function createSalesInvoice(){
-    const tbody = document.querySelector('#voucherTable tbody');
-    tbody.innerHTML = '';
-    
-    // 50000-100000 arasında son 3 hanesi sıfır olan rastgele sayı üret
-    const randomAmount = Math.floor(Math.random() * 51 + 50) * 1000; // 50000-100000 arası, 1000'in katları
-    
-    // KDV hesapla (%20)
-    const kdvAmount = randomAmount * 0.2;
-    
-    // Toplam tutar
-    const totalAmount = randomAmount + kdvAmount;
-    
-    // Satırları ekle
-    addVoucherRow({ 
-        account: '120', 
-        debit: totalAmount,
-        desc: 'satış faturası toplam'
-    });
-    const qtySales = Math.floor(Math.random() * 21) + 80; // 80–100 (dahil)
-    addVoucherRow({ 
-        account: '600', 
-        credit: randomAmount,
-        quantity: qtySales,              // ← Miktar burada
-        desc: 'satış faturası'
-    });
-    addVoucherRow({ 
-        account: '391', 
-        credit: kdvAmount,
-        desc: 'satış faturası KDV'
-    });
-    
-    document.getElementById('v_desc').value = 'Satış Faturası';
-    markDirty();
-    recalcVoucherTotals();
-    const firstInput = tbody.querySelector('tr:first-child input.right');
-    if(firstInput) firstInput.focus();
-}
-
   // ---------- Enter ile ileri (Tab gibi) ----------
   function focusablesInVoucher(){
     return Array.from(document.querySelectorAll(
@@ -3226,9 +3399,6 @@ function applyTemplateByKey(key){
     document.getElementById('v_edit').addEventListener('click', ()=> setVoucherEditable(true));
     document.getElementById('v_new').addEventListener('click', newVoucher);
     document.getElementById('v_delete').addEventListener('click', deleteVoucher);
-    document.getElementById('btnPurchaseInv').addEventListener('click', createPurchaseInvoice);
-    document.getElementById('btnSalesInv').addEventListener('click', createSalesInvoice);
-
     // Şablon seçimi
     document.getElementById('tplSelect').addEventListener('change', (e)=>{
       const val = e.target.value;
@@ -3258,6 +3428,8 @@ function applyTemplateByKey(key){
     
     document.getElementById('v_prev').addEventListener('click', ()=> navigateVoucher('prev')); // AŞAĞI (daha eski)
     document.getElementById('v_next').addEventListener('click', ()=> navigateVoucher('next')); // YUKARI (daha yeni)
+    document.getElementById('v_sort_date').addEventListener('click', ()=> setVoucherSortMode('date'));
+    document.getElementById('v_sort_no').addEventListener('click', ()=> setVoucherSortMode('number'));
 
     // Başlangıç durumu
     newVoucher();
