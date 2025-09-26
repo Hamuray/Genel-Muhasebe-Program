@@ -354,7 +354,7 @@ fieldset.readonly {
     </fieldset>
 
     <fieldset>
-      <legend><button class="toggle-btn" id="toggleReports" aria-expanded="false" aria-controls="reportsContent">[+]</button>Raporlar (Yeni Sekmede)</legend>
+      <legend><button class="toggle-btn" id="toggleReports" aria-expanded="false" aria-controls="reportsContent">[+]</button>Raporlar</legend>
       <div id="reportsContent" class="collapsed-content">
         <div class="row">
           <div>
@@ -378,6 +378,7 @@ fieldset.readonly {
             <option value="" selected>Yevmiye Dökümü</option>
             <option value="journal1">Yevmiye 1</option>
             <option value="journal2">Yevmiye 2</option>
+            <option value="journal3">Yevmiye 3 (Sıralı)</option>
           </select>
           <button id="rpTrial">Mizan Raporu</button>
           <button id="rpStock">Stok Raporu</button>
@@ -1236,7 +1237,12 @@ function setVoucherEditable(isEditable){
     setSavedMessage(false);
   }
 
-  function upsertVoucher(v){
+  function upsertVoucher(v, opts = {}){
+    const {
+      useOriginalKeyLookup = true,
+      updateCurrentKey = true,
+    } = opts;
+
     if(!v.date) throw new Error('Tarih zorunudur.');
     if(!v.no)   throw new Error('Fiş No boş olamaz.');
     if(!Array.isArray(v.lines)||v.lines.length<2) throw new Error('Bir fiş en az 2 satırdan oluşmalıdır.');
@@ -1254,7 +1260,7 @@ function setVoucherEditable(isEditable){
 
     let idx = DB.vouchers.findIndex(x=>String(x.no)===keyNo && ymd(x.date)===keyDate);
 
-    if(idx < 0 && CURRENT_VOUCHER_ORIGINAL_KEY){
+    if(idx < 0 && useOriginalKeyLookup && CURRENT_VOUCHER_ORIGINAL_KEY){
       const [origDate, origNo] = CURRENT_VOUCHER_ORIGINAL_KEY.split('|');
       if (origDate && origNo){
         idx = DB.vouchers.findIndex(x=>String(x.no)===String(origNo) && ymd(x.date)===origDate);
@@ -1262,7 +1268,9 @@ function setVoucherEditable(isEditable){
     }
 
     if(idx>=0) DB.vouchers[idx]=v; else DB.vouchers.push(v);
-    CURRENT_VOUCHER_ORIGINAL_KEY = keyDate + '|' + keyNo;
+    if (updateCurrentKey){
+      CURRENT_VOUCHER_ORIGINAL_KEY = keyDate + '|' + keyNo;
+    }
     saveDB();
   }
 
@@ -1753,13 +1761,9 @@ function renderMizan(){
     </table>`;
 }
 
-function makeJournalReport2HTML(){
-  const {from,to} = getReportRange();
-  const sorted = [...DB.vouchers].sort(
-    (a,b)=> Number(a.no) - Number(b.no) || ymd(a.date).localeCompare(ymd(b.date))
-  );
+function buildJournalReport2StyleHTML(vouchers, range){
+  const {from,to} = range || getReportRange();
 
-  // Düzen (ince ayar)
   const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
   const TOTAL = 68;      // Üst çizginin uzunluğu ve sol kolon genişliği (karakter)
   const W_DEBIT = 13;    // BORÇ kolon genişliği (karakter)
@@ -1772,7 +1776,6 @@ function makeJournalReport2HTML(){
   const padR = (s,w)=>{ s=String(s||''); return s.length>=w ? s.slice(0,w) : s+' '.repeat(w-s.length); };
   const row  = (left,db,cr)=> padR(cut(left,W_LEFT),W_LEFT) + SEP + padL(cut(db,W_DEBIT),W_DEBIT) + SEP + padL(cut(cr,W_CREDIT),W_CREDIT);
 
-  // "Fiş No ---- Tarih ----" üst çizgisi
   const headLine = (no,dateText)=>{
     const left = String(no||'');
     const mid  = String(dateText||'');
@@ -1784,38 +1787,32 @@ function makeJournalReport2HTML(){
 
   const blocks = [];
 
-  for (const v of sorted){
+  for (const v of vouchers){
     const vd = parseDateInput(ymd(v.date));
     if(!inRange(vd, from, to)) continue;
 
     const lines = [];
 
-    // 1) Üst çizgi: "No ---- Tarih ----"
     lines.push(headLine(String(v.no||''), dmyFromISO(v.date)));
-
-    // 2) Başlıklar ve alt çizgileri (6 karakter)
     lines.push(row('', 'BORÇ', 'ALACAK'));
-    lines.push(row('', '______', '______')); // ← 6 karakter alt çizgi
+    lines.push(row('', '______', '______'));
 
-    // 3) Hesap satırları (alacak 5 boşluk içeriden)
     (v.lines||[]).forEach(ln=>{
       const accName = getAccName(ln.account);
       const baseAcc = `${String(ln.account||'')}.${accName||''}`;
       const isCredit = toNum(ln.credit) > 0 && toNum(ln.debit) === 0;
-      const leftText = (isCredit ? '     ' : '') + baseAcc; // 5 boşluk
+      const leftText = (isCredit ? '     ' : '') + baseAcc;
       const d = fmtNoZero(toNum(ln.debit));
       const c = fmtNoZero(toNum(ln.credit));
       lines.push(row(leftText, d, c));
     });
 
-    // 4) Açıklama satırı (çizgiler arasında kalır)
     const parts = [];
     if (v.desc) parts.push(v.desc);
     (v.lines||[]).forEach(ln=>{ if(ln.desc) parts.push(ln.desc); });
     const descLine = 'Açıklama: ' + (parts.join(', ') || '');
     lines.push(padR(cut(descLine, TOTAL), TOTAL));
 
-    // 5) (Önceden eklediğimiz ayırıcı çizgi KALDIRILDI) — sadece boş satır bırak
     lines.push('');
 
     blocks.push(
@@ -1828,6 +1825,52 @@ function makeJournalReport2HTML(){
   }
 
   return `<div style="width:auto">${blocks.join('')}</div>`;
+}
+
+function makeJournalReport2HTML(){
+  const range = getReportRange();
+  const sorted = [...DB.vouchers].sort(
+    (a,b)=> Number(a.no) - Number(b.no) || ymd(a.date).localeCompare(ymd(b.date))
+  );
+  return buildJournalReport2StyleHTML(sorted, range);
+}
+
+function makeJournalReport3HTML(){
+  const range = getReportRange();
+  const withIndex = DB.vouchers.map((v, idx)=>({ voucher: v, idx }));
+  const sortedByDate = withIndex.slice().sort((a,b)=>{
+    const dateA = ymd(a.voucher.date);
+    const dateB = ymd(b.voucher.date);
+    const cmpDate = dateA.localeCompare(dateB);
+    if (cmpDate !== 0) return cmpDate;
+
+    const rawNoA = a.voucher.no;
+    const rawNoB = b.voucher.no;
+    const strA = rawNoA == null ? '' : String(rawNoA).trim();
+    const strB = rawNoB == null ? '' : String(rawNoB).trim();
+    if (strA && strB){
+      const numA = Number(strA);
+      const numB = Number(strB);
+      if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB){
+        return numA - numB;
+      }
+    }
+
+    return a.idx - b.idx;
+  });
+
+  const filtered = sortedByDate.filter(entry=>{
+    const vd = parseDateInput(ymd(entry.voucher.date));
+    return inRange(vd, range.from, range.to);
+  });
+
+  const renumbered = filtered.map((entry, i)=>({
+    ...entry.voucher,
+    no: i + 1,
+    lines: (entry.voucher.lines || []).map(ln=>({ ...ln }))
+  }));
+
+  return buildJournalReport2StyleHTML(renumbered, range);
 }
 
 
@@ -2760,11 +2803,13 @@ function makeVoucherPrintHTML(){
     populateReportAccountSelect();
     const journalSelect = document.getElementById('rpJournalSelect');
     journalSelect.addEventListener('change', (event)=>{
-      if(event.target.value === 'journal1'){
+      const selected = event.target.value;
+      if(selected === 'journal1'){
         openReportInNewTab('Yevmiye Dökümü', makeJournalReportHTML());
-      }
-      if(event.target.value === 'journal2'){
+      } else if(selected === 'journal2'){
         openReportInNewTab('Yevmiye Dökümü 2', makeJournalReport2HTML());
+      } else if(selected === 'journal3'){
+        openReportInNewTab('Yevmiye Dökümü 3 (Sıralı)', makeJournalReport3HTML());
       }
       event.target.value = '';
     });
@@ -2895,7 +2940,17 @@ function slugTR(s) {
         }
 
         let ok=0, fail=0, errs=[];
-        groups.forEach(v=>{ try{ upsertVoucher(v); ok++; } catch(e){ fail++; errs.push(e.message); } });
+        groups.forEach(v=>{
+          try{
+            upsertVoucher(v, { useOriginalKeyLookup: false, updateCurrentKey: false });
+            ok++;
+          } catch(e){
+            fail++;
+            errs.push(e.message);
+          }
+        });
+
+        CURRENT_VOUCHER_ORIGINAL_KEY = null;
 
         refreshVoucherList();
         renderMizan();
