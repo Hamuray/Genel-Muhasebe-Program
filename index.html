@@ -10,6 +10,21 @@
     body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
     .container{max-width:1100px; margin:28px auto; padding:0 16px}
     h1{margin:0 0 16px; font-size:28px}
+    .app-header{display:flex; align-items:center; gap:16px; margin-bottom:16px}
+    .app-header h1{margin:0}
+    .user-info{display:none; align-items:center; gap:12px; margin-left:auto}
+    .user-info.is-visible{display:flex}
+    .user-chip{font-size:12pt; font-weight:700; color:#000}
+    #backupNotice{display:none; align-items:center; gap:8px; margin-left:auto; font-size:12px; font-weight:600; color:#991b1b;}
+    #backupNotice.is-visible{display:inline-flex;}
+    .login-modal{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(17,24,39,0.6); z-index:1000; padding:16px}
+    .login-modal.hidden{display:none}
+    .login-card{background:#fff; border-radius:14px; padding:24px; max-width:360px; width:100%; box-shadow:0 10px 40px rgba(15,23,42,.2); display:flex; flex-direction:column; gap:12px}
+    .login-card h2{margin:0 0 8px; font-size:20px}
+    .login-card label{margin:8px 0 4px; font-weight:600}
+    .login-card input{width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:10px; font-size:14px}
+    .login-card button{margin-top:8px}
+    .login-error{color:#b91c1c; font-size:12px; display:none}
     fieldset{border:1px solid var(--line); background:var(--card); border-radius:14px; padding:14px; margin:14px 0}
     legend{padding:0 6px; font-weight:700; display:flex; align-items:center; gap:8px;}
     label{display:block; font-weight:600; margin:6px 0}
@@ -37,7 +52,20 @@
     .hint{font-size:12px; color:#6b7280}
     .warn{ background:#fff1f2; }
     .warn td{ color:#991b1b; }
+    /* Mizan satırı seçimi için vurgu */
+    #mizanTable tbody tr.mizan-selected,
+    #mizanTable tbody tr.mizan-selected td{
+      background:#dbeafe !important;
+    }
     input[readonly]{ background:#f3f4f6; color:#6b7280; }
+
+    /* Hatalar ve Uyarılar alanı */
+    #warningsFieldset{ transition:background-color .2s ease, border-color .2s ease; }
+    #warningsFieldset.has-warnings{ background:#ffe4ec; border-color:#f9a8d4; }
+    #warningsContent{ margin-top:6px; }
+    .warnings-list{ display:flex; flex-direction:column; gap:8px; }
+    .warnings-item{ background:#ffe4ec; border:1px solid #f9a8d4; border-radius:10px; padding:8px 10px; font-size:10pt; color:#7f1d1d; }
+    .warnings-empty{ font-size:10pt; color:var(--muted); }
 
     /* Fiş toplam hücreleri için durum renkleri */
     .total-sum{ transition:background-color .2s ease; }
@@ -188,8 +216,26 @@ fieldset.readonly {
   </style>
 </head>
 <body>
+  <div id="loginModal" class="login-modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form id="loginForm" class="login-card">
+      <h2 id="loginTitle">Kullanıcı Girişi</h2>
+      <label for="loginCode">Kullanıcı Kodu</label>
+      <input type="text" id="loginCode" name="loginCode" autocomplete="off" required autofocus />
+      <label for="loginName">Ad Soyad</label>
+      <input type="text" id="loginName" name="loginName" placeholder="Adınızı giriniz" autocomplete="name" required />
+      <div id="loginError" class="login-error" role="alert"></div>
+      <button type="submit" class="primary">Giriş Yap</button>
+    </form>
+  </div>
   <div class="container">
-    <h1>Genel Muhasebe Programı</h1>
+    <div class="app-header">
+      <h1>Genel Muhasebe Programı</h1>
+      <div id="userInfo" class="user-info" aria-live="polite">
+        <span id="userCodeDisplay" class="user-chip"></span>
+        <span id="userNameDisplay" class="user-chip"></span>
+      </div>
+      <div id="backupNotice" class="pill warn" role="status" aria-live="polite"></div>
+    </div>
 
     <fieldset>
       <legend>Fiş Girişi</legend>
@@ -353,6 +399,13 @@ fieldset.readonly {
       </div>
     </fieldset>
 
+    <fieldset id="warningsFieldset">
+      <legend><button class="toggle-btn" id="toggleWarnings" aria-expanded="false" aria-controls="warningsContent">[+]</button>Hatalar ve Uyarılar</legend>
+      <div id="warningsContent" class="collapsed-content">
+        <div id="warningsList" class="warnings-list" role="status" aria-live="polite"></div>
+      </div>
+    </fieldset>
+
     <fieldset>
       <legend><button class="toggle-btn" id="toggleReports" aria-expanded="false" aria-controls="reportsContent">[+]</button>Raporlar</legend>
       <div id="reportsContent" class="collapsed-content">
@@ -418,6 +471,158 @@ fieldset.readonly {
   // BASİT MUHASEBE - Tek Dosya (Hesap Planı SABİT)
   // =====================
 
+  const loginModal = document.getElementById('loginModal');
+  const loginForm = document.getElementById('loginForm');
+  const loginCodeInput = document.getElementById('loginCode');
+  const loginNameInput = document.getElementById('loginName');
+  const loginError = document.getElementById('loginError');
+  const userInfo = document.getElementById('userInfo');
+  const userCodeDisplay = document.getElementById('userCodeDisplay');
+  const userNameDisplay = document.getElementById('userNameDisplay');
+  const backupNotice = document.getElementById('backupNotice');
+  const ADMIN_SETTINGS = { code: 'admin', displayCode: 'Admin', secret: 'myo3301', mask: '*******' };
+  function isAdminCode(value){
+    return String(value || '').trim().toLowerCase() === ADMIN_SETTINGS.code;
+  }
+  function toAdminDisplayCode(value){
+    return isAdminCode(value) ? ADMIN_SETTINGS.displayCode : String(value || '').trim();
+  }
+  let currentUserCode = '';
+  let currentUserName = '';
+  let autoClearScheduled = false;
+
+  function isValidUserCode(code){
+    if(isAdminCode(code)) return true;
+    return /^(?:isl|muh)(0[1-9]|[1-9][0-9])$/.test(code);
+  }
+
+  const defaultNamePlaceholder = loginNameInput ? loginNameInput.placeholder : '';
+  function updateLoginNameInputMode(code){
+    if(!loginNameInput) return;
+    if(isAdminCode(code)){
+      loginNameInput.type = 'password';
+      loginNameInput.placeholder = 'Şifre giriniz';
+    } else {
+      loginNameInput.type = 'text';
+      loginNameInput.placeholder = defaultNamePlaceholder;
+    }
+  }
+
+  function showOwnerMismatchPrompt(ownerCode){
+    if(!loginError) return;
+    loginError.innerHTML = '';
+
+    const message = document.createElement('div');
+    message.textContent = 'Bu tarayıcıdaki veriler farklı bir kullanıcıya ait, önce o kullanıcı koduyla giriş yapmalısınız';
+    loginError.appendChild(message);
+
+    if(ownerCode){
+      const info = document.createElement('div');
+      info.classList.add('hint');
+      info.textContent = `Kayıtlı kullanıcı kodu: ${ownerCode}`;
+      loginError.appendChild(info);
+    }
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.textContent = 'Mevcut verileri temizleyip sıfırdan başla';
+    resetBtn.style.marginTop = '8px';
+    resetBtn.addEventListener('click', ()=>{
+      resetBtn.disabled = true;
+      clearAll({ skipConfirm:true });
+      loginError.innerHTML = '';
+      const clearedMsg = document.createElement('div');
+      clearedMsg.textContent = 'Veriler temizlendi. Lütfen tekrar giriş yapın.';
+      loginError.appendChild(clearedMsg);
+      loginError.style.display = 'block';
+      loginCodeInput.focus();
+    });
+    loginError.appendChild(resetBtn);
+
+    loginError.style.display = 'block';
+    loginCodeInput.focus();
+  }
+
+  if(loginForm && loginModal && userInfo){
+    loginForm.addEventListener('submit', (event)=>{
+      event.preventDefault();
+      const rawCode = loginCodeInput.value.trim();
+      const rawName = loginNameInput.value.trim();
+      if(!isValidUserCode(rawCode)){
+        loginError.textContent = 'Kullanıcı kodu geçersiz.';
+        loginError.style.display = 'block';
+        loginCodeInput.focus();
+        return;
+      }
+
+      if(!rawName){
+        loginError.textContent = 'Ad soyad alanı boş bırakılamaz.';
+        loginError.style.display = 'block';
+        loginNameInput.focus();
+        return;
+      }
+
+      const isAdmin = isAdminCode(rawCode);
+      if(isAdmin && rawName !== ADMIN_SETTINGS.secret){
+        loginError.textContent = 'Şifre yanlış.';
+        loginError.style.display = 'block';
+        loginNameInput.focus();
+        return;
+      }
+
+      const owner = (storedOwnerInfo && storedOwnerInfo.code) ? storedOwnerInfo : loadStoredOwnerInfo();
+      if(!isAdmin && owner && owner.code && !isAdminCode(owner.code) && owner.code !== rawCode){
+        showOwnerMismatchPrompt(owner.code);
+        return;
+      }
+
+      loginError.textContent = '';
+      loginError.style.display = 'none';
+
+      const normalizedCode = toAdminDisplayCode(rawCode);
+      const displayName = isAdmin ? ADMIN_SETTINGS.mask : rawName;
+
+      userCodeDisplay.textContent = 'Kullanıcı Kodu: ' + normalizedCode;
+      userNameDisplay.textContent = 'Ad Soyad: ' + displayName;
+      userInfo.classList.add('is-visible');
+
+      currentUserCode = normalizedCode;
+      currentUserName = displayName;
+      if(!isAdmin){
+        ensureStoredOwnerForCurrentUser();
+      }
+      updateBackupNotice();
+
+      loginModal.classList.add('hidden');
+      loginModal.setAttribute('aria-hidden','true');
+
+      loginCodeInput.value = '';
+      loginNameInput.value = '';
+      updateLoginNameInputMode('');
+
+      const firstField = document.getElementById('v_tarih');
+      if(firstField){
+        firstField.focus();
+      }
+    });
+
+    if(loginCodeInput){
+      loginCodeInput.addEventListener('input', ()=>{
+        updateLoginNameInputMode(loginCodeInput.value);
+        loginError.textContent = '';
+        loginError.style.display = 'none';
+      });
+      updateLoginNameInputMode(loginCodeInput.value);
+    }
+
+    if(loginNameInput){
+      loginNameInput.addEventListener('input', ()=>{
+        loginError.textContent = '';
+        loginError.style.display = 'none';
+      });
+    }
+  }
+
   // --- Kaydet mesajı kontrolü ve "dirty" takibi ---
   let FORM_DIRTY = false;
   let READONLY_MODE = false; // pasif fişte true
@@ -439,6 +644,7 @@ fieldset.readonly {
   // --- Son kullanılan/odaklanan hesap ve odak satırı ---
   let LAST_USED_ACCOUNT = '';
   let CURRENT_VOUCHER_ROW = null; // imlecin (focus) olduğu tr
+  let CURRENT_MIZAN_SELECTION = null; // mizan tablosunda seçilen satır bilgisi
 
   let ACCOUNTS = [
     {code:'100', name:'KASA', side:'B'},
@@ -725,7 +931,12 @@ fieldset.readonly {
 
 
   const STORE_KEY = 'bmuhasebe_v2_vouchers_only';
+  const STORE_LAST_IMPORT_KEY = 'bmuhasebe_v2_last_import_meta';
+  const STORE_OWNER_KEY = 'bmuhasebe_v2_owner';
+  const APP_VERSION = '1.0.0';
   let DB = { vouchers: [] }; // {date,no,desc,lines:[{account,debit,credit,quantity,desc}]}
+  let lastImportInfo = null;
+  let storedOwnerInfo = null;
 
   // ---------- Yardımcılar ----------
   function fmt(n){
@@ -747,6 +958,129 @@ function normHeader(s){
   // slug + tüm boşlukları tamamen kaldır -> "fis aciklamasi" => "fisaciklamasi"
   return slugTR(s).replace(/\s+/g,'');
 }
+
+  function bufferToHex(buffer){
+    return Array.from(new Uint8Array(buffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function fallbackHash(bytes){
+    const seeds = [0x811c9dc5, 0x45d9f3b, 0x1b873593, 0x9e3779b9];
+    const state = seeds.slice();
+    for(const byte of bytes){
+      state[0] = Math.imul(state[0] ^ byte, 0x01000193);
+      state[1] = Math.imul(state[1] ^ ((byte << 5) | (byte >>> 3)), 0x01000193);
+      state[2] = Math.imul(state[2] ^ ((byte << 11) | (byte >>> 5)), 0x01000193);
+      state[3] = Math.imul(state[3] ^ ((byte << 17) | (byte >>> 7)), 0x01000193);
+    }
+    const buffer = new ArrayBuffer(16);
+    const view = new DataView(buffer);
+    state.forEach((val, idx)=>view.setUint32(idx*4, val>>>0, false));
+    return bufferToHex(buffer).padEnd(64,'0');
+  }
+
+  async function computeSHA256Hex(content){
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const cryptoObj = (window.crypto || window.msCrypto || null);
+    if(cryptoObj && cryptoObj.subtle && cryptoObj.subtle.digest){
+      const digest = await cryptoObj.subtle.digest('SHA-256', data);
+      return bufferToHex(digest);
+    }
+    return fallbackHash(data);
+  }
+
+  function loadStoredLastImportInfo(){
+    try{
+      const raw = localStorage.getItem(STORE_LAST_IMPORT_KEY);
+      if(!raw) return null;
+      const data = JSON.parse(raw);
+      if(data && typeof data === 'object') return data;
+    }catch(e){}
+    return null;
+  }
+
+  function saveLastImportInfo(info){
+    if(info){
+      lastImportInfo = info;
+      localStorage.setItem(STORE_LAST_IMPORT_KEY, JSON.stringify(info));
+    } else {
+      lastImportInfo = null;
+      localStorage.removeItem(STORE_LAST_IMPORT_KEY);
+    }
+    updateBackupNotice();
+  }
+
+  function clearLastImportInfo(){
+    saveLastImportInfo(null);
+  }
+
+  function loadStoredOwnerInfo(){
+    try{
+      const raw = localStorage.getItem(STORE_OWNER_KEY);
+      if(!raw) return null;
+      const data = JSON.parse(raw);
+      if(data && typeof data === 'object'){
+        const code = typeof data.code === 'string' ? data.code.trim() : '';
+        if(code){
+          return {
+            code,
+            name: typeof data.name === 'string' ? data.name.trim() : ''
+          };
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+
+  function saveStoredOwnerInfo(info){
+    if(info && typeof info === 'object' && typeof info.code === 'string' && info.code.trim()){
+      const payload = {
+        code: info.code.trim(),
+        name: typeof info.name === 'string' ? info.name.trim() : ''
+      };
+      storedOwnerInfo = payload;
+      localStorage.setItem(STORE_OWNER_KEY, JSON.stringify(payload));
+    } else {
+      storedOwnerInfo = null;
+      localStorage.removeItem(STORE_OWNER_KEY);
+    }
+  }
+
+  function ensureStoredOwnerForCurrentUser(){
+    if(!currentUserCode || isAdminCode(currentUserCode)) return;
+    const desired = {
+      code: currentUserCode.trim(),
+      name: (currentUserName || '').trim()
+    };
+    if(storedOwnerInfo && storedOwnerInfo.code === desired.code && storedOwnerInfo.name === desired.name){
+      return;
+    }
+    saveStoredOwnerInfo(desired);
+  }
+
+  storedOwnerInfo = loadStoredOwnerInfo();
+
+  function updateBackupNotice(){
+    if(!backupNotice) return;
+    const mismatch = !isAdminCode(currentUserCode) && lastImportInfo && lastImportInfo.code && currentUserCode && lastImportInfo.code !== currentUserCode && DB.vouchers.length > 0;
+    if(mismatch){
+      backupNotice.textContent = 'Farklı bir kullanıcıdan yüklenen fişler mevcut.';
+      backupNotice.classList.add('is-visible');
+      if(!autoClearScheduled){
+        autoClearScheduled = true;
+        setTimeout(()=>{
+          alert('tüm verileriniz temizleniyor. yeniden giriş yapınız');
+        }, 0);
+        setTimeout(()=>{
+          clearAll({ skipConfirm:true, reload:true });
+        }, 1000);
+      }
+    } else {
+      backupNotice.textContent = '';
+      backupNotice.classList.remove('is-visible');
+      autoClearScheduled = false;
+    }
+  }
 
   function fmtNoZero(n){
     const num = Number(n)||0;
@@ -893,8 +1227,15 @@ function prepareYansitmaTemplate(opts = {}){
         if(Array.isArray(data.vouchers)) DB.vouchers = data.vouchers;
       }
     }catch(e){}
+    lastImportInfo = loadStoredLastImportInfo();
+    storedOwnerInfo = loadStoredOwnerInfo();
+    updateBackupNotice();
   }
-  function saveDB(){ localStorage.setItem(STORE_KEY, JSON.stringify({vouchers: DB.vouchers})); }
+  function saveDB(){
+    ensureStoredOwnerForCurrentUser();
+    localStorage.setItem(STORE_KEY, JSON.stringify({vouchers: DB.vouchers}));
+    updateBackupNotice();
+  }
 
   // ------- Para girişi: canlı biçim (kuruş girişi için virgül desteği) -------
   function attachMoneyMask(el, peerToClear){
@@ -1562,6 +1903,8 @@ function renderMizan(){
     .sort((a,b) => a.code.localeCompare(b.code)); // metin sırası
 
   const tb = document.querySelector('#mizanTable tbody');
+  const prevSelectionCode = CURRENT_MIZAN_SELECTION ? CURRENT_MIZAN_SELECTION.code : null;
+  CURRENT_MIZAN_SELECTION = null;
   tb.innerHTML = '';
 
   rows.forEach(r=>{
@@ -1573,6 +1916,7 @@ function renderMizan(){
 
     const tr = document.createElement('tr');
     if (mismatch) tr.classList.add('warn');
+    tr.tabIndex = 0;
 
     tr.innerHTML = `
       <td>${escapeHTML(r.code)}</td>
@@ -1585,7 +1929,19 @@ function renderMizan(){
       <td class="right">${fmtNoZero(r.quantity)}</td>
       <td>${escapeHTML(note)}</td>
     `;
+    tr.dataset.accountCode = r.code;
+    tr.addEventListener('click', ()=>{
+      selectMizanRow(tr, r);
+    });
+    tr.addEventListener('dblclick', ()=>{
+      selectMizanRow(tr, r, {focus:false});
+      openMizanLedger(r);
+    });
     tb.appendChild(tr);
+
+    if (prevSelectionCode && prevSelectionCode === r.code && !CURRENT_MIZAN_SELECTION){
+      selectMizanRow(tr, r, {focus:false});
+    }
   });
 
   // Genel toplamlar
@@ -1603,6 +1959,195 @@ function renderMizan(){
 
   document.getElementById('tBorcBakiye').textContent   = fmtNoZero(bTot.borc);
   document.getElementById('tAlacakBakiye').textContent = fmtNoZero(bTot.alacak);
+
+  updateWarningsArea(map, rows, {from, to});
+}
+
+function selectMizanRow(tr, rowData, options){
+  if(!tr || !rowData) return;
+  const opts = options || {};
+  if (CURRENT_MIZAN_SELECTION && CURRENT_MIZAN_SELECTION.tr && CURRENT_MIZAN_SELECTION.tr !== tr){
+    CURRENT_MIZAN_SELECTION.tr.classList.remove('mizan-selected');
+  }
+  CURRENT_MIZAN_SELECTION = { tr, code: rowData.code, data: rowData };
+  tr.classList.add('mizan-selected');
+  if (opts.focus !== false){
+    if (typeof tr.focus === 'function'){
+      try{ tr.focus({ preventScroll: true }); }
+      catch(_){ tr.focus(); }
+    }
+  }
+}
+
+function openMizanLedger(rowData){
+  if(!rowData || !rowData.code) return;
+  const range = getMizanRange();
+  const rpAccountSel = document.getElementById('rpAccount');
+  if (rpAccountSel) rpAccountSel.value = rowData.code;
+  const accountTitle = rowData.name ? `${rowData.code} ${rowData.name}` : rowData.code;
+  openReportInNewTab(`Hesap Ekstresi - ${accountTitle}`.trim(), makeLedgerReportHTML(rowData.code, range));
+}
+
+document.addEventListener('keydown', (event)=>{
+  if (event.key !== 'Enter') return;
+  if (!CURRENT_MIZAN_SELECTION || !CURRENT_MIZAN_SELECTION.data) return;
+  const active = document.activeElement;
+  if (active && (active.isContentEditable || ['INPUT','TEXTAREA','SELECT','BUTTON'].includes(active.tagName))) return;
+  event.preventDefault();
+  openMizanLedger(CURRENT_MIZAN_SELECTION.data);
+});
+
+const WARN_EPS = 0.005;
+
+function updateWarningsArea(map, rows, range){
+  const warnings = [];
+
+  const mismatchCodes = rows
+    .filter(r => {
+      if (!r.expected) return false;
+      const diff = r.debit - r.credit;
+      if (Math.abs(diff) <= WARN_EPS) return false;
+      const side = diff > 0 ? 'B' : 'A';
+      return r.expected !== side;
+    })
+    .map(r => r.code);
+
+  if (mismatchCodes.length){
+    warnings.push(`${mismatchCodes.join(', ')} hesaplar ters bakiye göstermektedir kontrol ediniz`);
+  }
+
+  const totals = computeBalanceSheetTotals(range);
+  if (totals){
+    const {assets, liabilities} = totals;
+    if (Math.abs(assets - liabilities) > WARN_EPS){
+      warnings.push('Bilançonuz eşit değil kontrol ediniz');
+    }
+  }
+
+  const qty153 = map['153'] ? map['153'].quantity : 0;
+  const qty600 = map['600'] ? map['600'].quantity : 0;
+  if (qty600 > qty153 + WARN_EPS){
+    warnings.push('Satış miktarı alış miktarından fazla. Kontrol ediniz');
+  }
+
+  const yansitmaPairs = [['760','761'], ['770','771'], ['780','781']];
+  const problematicPairs = [];
+  yansitmaPairs.forEach(([a, b]) => {
+    const accA = map[a] || {debit:0, credit:0};
+    const accB = map[b] || {debit:0, credit:0};
+    const netA = accA.debit - accA.credit;
+    const netB = accB.debit - accB.credit;
+    if (Math.abs(netA) <= WARN_EPS && Math.abs(netB) <= WARN_EPS) return;
+    if (Math.abs(netA + netB) > WARN_EPS){
+      problematicPairs.push(`${a} ve ${b}`);
+    }
+  });
+  if (problematicPairs.length){
+    warnings.push(`${problematicPairs.join(', ')} hesaplarının bakiyeleri eşit değil, yansıtma kayıtlarını dönem sonunda yapınız`);
+  }
+
+  updateWarningsDisplay(warnings);
+}
+
+function computeBalanceSheetTotals(range){
+  const from = range?.from || null;
+  const to = range?.to || null;
+  const inRangeVoucher = (v) => {
+    const d = parseDateInput(ymd(v.date));
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  };
+
+  const totals = {};
+  DB.vouchers.forEach(v => {
+    if (!inRangeVoucher(v)) return;
+    (v.lines || []).forEach(ln => {
+      const code = String(ln.account || '').trim();
+      if (!/^[1-5]\d{2}$/.test(code)) return;
+      if (!totals[code]) totals[code] = {db:0, cr:0};
+      totals[code].db += toNum(ln.debit);
+      totals[code].cr += toNum(ln.credit);
+    });
+  });
+
+  const accountAmounts = {};
+  Object.keys(totals).forEach(code => {
+    const diff = totals[code].db - totals[code].cr;
+    const amount = (code[0] === '1' || code[0] === '2') ? diff : -diff;
+    if (Math.abs(amount) <= WARN_EPS) return;
+    accountAmounts[code] = amount;
+  });
+
+  const net6 = {};
+  DB.vouchers.forEach(v => {
+    if (!inRangeVoucher(v)) return;
+    (v.lines || []).forEach(ln => {
+      const code = String(ln.account || '').trim();
+      if (!/^6\d{2}$/.test(code)) return;
+      if (!net6[code]) net6[code] = 0;
+      net6[code] += toNum(ln.credit) - toNum(ln.debit);
+    });
+  });
+
+  const used6 = Object.keys(net6).some(k => Math.abs(net6[k]) > WARN_EPS);
+  if (used6){
+    const sum = list => list.reduce((s, c) => s + (net6[c] || 0), 0);
+    const netSales = sum(['600','601','602','610','611','612']);
+    const costs = sum(['620','621','622','623']);
+    const gross = netSales + costs;
+    const opex = sum(['630','631','632']);
+    const oper = gross + opex;
+    const otherInc = sum(['640','641','642','643','644','645','646','647','649']);
+    const otherExp = sum(['653','654','655','656','657','659','660','661']);
+    const ordinary = oper + otherInc + otherExp;
+    const extraInc = sum(['671','679']);
+    const extraExp = sum(['680','681','689']);
+    const period = ordinary + extraInc + extraExp;
+    const tax = net6['691'] || 0;
+    const netProfit = period + tax;
+
+    if (Math.abs(netProfit) > WARN_EPS){
+      delete accountAmounts['590'];
+      delete accountAmounts['591'];
+      const code = netProfit > 0 ? '590' : '591';
+      accountAmounts[code] = netProfit;
+    }
+  }
+
+  let assets = 0;
+  let liabilities = 0;
+  Object.entries(accountAmounts).forEach(([code, amount]) => {
+    if (code[0] === '1' || code[0] === '2') assets += amount;
+    else if (code[0] === '3' || code[0] === '4' || code[0] === '5') liabilities += amount;
+  });
+
+  return {assets, liabilities};
+}
+
+function updateWarningsDisplay(warnings){
+  const listEl = document.getElementById('warningsList');
+  const fieldset = document.getElementById('warningsFieldset');
+  if (!listEl || !fieldset) return;
+
+  listEl.innerHTML = '';
+
+  if (!warnings.length){
+    fieldset.classList.remove('has-warnings');
+    const empty = document.createElement('div');
+    empty.className = 'warnings-empty';
+    empty.textContent = 'Uyarı bulunmuyor.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  fieldset.classList.add('has-warnings');
+  warnings.forEach(msg => {
+    const item = document.createElement('div');
+    item.className = 'warnings-item';
+    item.textContent = `*${msg}`;
+    listEl.appendChild(item);
+  });
 }
 
 
@@ -1635,6 +2180,10 @@ function renderMizan(){
   .voucher-separator td { border: none; height: 10px; border-bottom: 1px solid #ccc; }
   .warn { background:#fff1f2; }
   .warn td { color:#991b1b; }
+  .report-shell{display:inline-block; max-width:100%;}
+  .title-row{display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 12px;}
+  .title-row h1{margin:0;}
+  .user-tag{font-size:14px; font-weight:600; color:var(--text); background:#fff9c4; padding:4px 8px; border-radius:6px; white-space:nowrap;}
 
   /* "Açıklama" sütunu: başlık ve hücreler class="desc-col" */
   th.desc-col, td.desc-col{
@@ -1648,12 +2197,58 @@ function renderMizan(){
 
     const now = new Date();
     const meta = `Oluşturma: ${ymd(now)} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const tagTitles = [
+      'Yevmiye Dökümü',
+      'Yevmiye Dökümü 2',
+      'Yevmiye Dökümü 3 (Sıralı)',
+      'Mizan Raporu',
+      'Stok Raporu',
+      'Kar/Zarar Raporu',
+      'Bilanço',
+      'Hesap Ekstresi'
+    ];
+
+    const userTagBlock = (() => {
+      if (!tagTitles.includes(title)) return `<h1>${escapeHTML(title)}</h1>`;
+      const parts = [currentUserCode, currentUserName].map(x => (x || '').trim()).filter(Boolean);
+      if (!parts.length) return `<h1>${escapeHTML(title)}</h1>`;
+      const userTag = escapeHTML(parts.join(', '));
+      return `<div class="title-row"><h1>${escapeHTML(title)}</h1><div class="user-tag">${userTag}</div></div>`;
+    })();
+
     const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHTML(title)}</title><style>${css}</style></head>
     <body>
       <div class="toolbar"><button onclick="window.print()">Yazdır</button></div>
-      <h1>${escapeHTML(title)}</h1>
-      <div class="meta">${escapeHTML(meta)}</div>
-      ${innerHTML}
+      <div class="report-shell">
+        ${userTagBlock}
+        <div class="meta">${escapeHTML(meta)}</div>
+        <div class="report-content">${innerHTML}</div>
+      </div>
+      <script>
+        window.addEventListener('load', () => {
+          const shell = document.querySelector('.report-shell');
+          if (!shell) return;
+          const header = shell.querySelector('.title-row, h1');
+          const content = shell.querySelector('.report-content');
+          const candidates = [];
+          if (header) candidates.push(header);
+          if (content){
+            candidates.push(content);
+            Array.from(content.children || []).forEach(node => candidates.push(node));
+          }
+          let maxWidth = 0;
+          candidates.forEach(node => {
+            if (!node || typeof node.getBoundingClientRect !== 'function') return;
+            const width = node.getBoundingClientRect().width;
+            if (width > maxWidth) maxWidth = width;
+          });
+          if (!maxWidth && content) maxWidth = content.scrollWidth;
+          if (maxWidth){
+            shell.style.width = maxWidth + 'px';
+            shell.style.maxWidth = '100%';
+          }
+        });
+      <\/script>
     </body></html>`;
     const url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
     window.open(url, '_blank');
@@ -1663,6 +2258,11 @@ function renderMizan(){
   function getReportRange(){
     const from = parseDateInput(document.getElementById('rpFrom').value);
     const to   = parseDateInput(document.getElementById('rpTo').value);
+    return {from, to};
+  }
+  function getMizanRange(){
+    const from = parseDateInput(document.getElementById('mzFrom').value);
+    const to   = parseDateInput(document.getElementById('mzTo').value);
     return {from, to};
   }
   function inRange(d, from, to){
@@ -1874,10 +2474,10 @@ function makeJournalReport3HTML(){
 }
 
 
-  function makeLedgerReportHTML(accountCode){
+  function makeLedgerReportHTML(accountCode, rangeOverride){
     if(!accountCode) return `<p>Lütfen hesap seçin.</p>`;
     const accMeta = ACCOUNTS.find(a=>a.code===accountCode) || {name:'', side: 'B'};
-    const {from,to} = getReportRange();
+    const {from,to} = rangeOverride || getReportRange();
     const items = [];
     DB.vouchers.forEach(v=>{
       const vd = parseDateInput(ymd(v.date));
@@ -2838,7 +3438,11 @@ function makeVoucherPrintHTML(){
   }
 
   // ---------- Veri Yönetimi ----------
-  function exportTSV(){
+  async function exportTSV(){
+    if(!currentUserCode){
+      alert('Yedek almak için önce kullanıcı girişi yapın.');
+      return;
+    }
     const headers = ['Tarih','FişNo','FişAçıklaması','HesapKodu','Borç','Alacak','Miktar','Açıklama'];
     const rows = [headers.join('\t')];
     DB.vouchers.forEach(v=>{
@@ -2849,10 +3453,24 @@ function makeVoucherPrintHTML(){
         rows.push([tarih,fisNo,fisAc,ln.account||'',fmt(toNum(ln.debit)),fmt(toNum(ln.credit)),fmt(toNum(ln.quantity)),ln.desc||''].join('\t'));
       });
     });
-    const tsv = '\uFEFF' + rows.join('\n');
+    const dataSection = rows.join('\n');
+    const hash = await computeSHA256Hex(dataSection);
+    const now = new Date();
+    const isoCreated = now.toISOString();
+    const metaLine = `#META\tcode=${currentUserCode}\thash=${hash}\tapp=${APP_VERSION}\tcreated=${isoCreated}`;
+    const tsv = '\uFEFF' + metaLine + '\n' + dataSection;
     const blob = new Blob([tsv], {type:'text/tab-separated-values;charset=utf-8'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'basit-muhasebe-fisler.tsv'; a.click();
+    const pad = (num)=>String(num).padStart(2,'0');
+    const timestamp = `${pad(now.getDate())}${pad(now.getMonth()+1)}${now.getFullYear()}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const toSafePart = (value, fallback)=>{
+      const normalized = slugTR(value).replace(/\s+/g,'_');
+      return normalized || fallback;
+    };
+    const codePart = toSafePart(currentUserCode, 'kod_yok');
+    const namePart = toSafePart(currentUserName, 'isim_yok');
+    const fileName = `Yedek_${codePart}_${namePart}_${timestamp}.tsv`;
+    const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
     setTimeout(()=>URL.revokeObjectURL(url), 1000);
   }
 
@@ -2867,27 +3485,64 @@ function makeVoucherPrintHTML(){
 
 
 
-function slugTR(s) {
-  return String(s ?? '')
-    .toLowerCase()
-    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '') // aksanları sil
-    .replace(/[ş]/g,'s').replace(/[ı]/g,'i').replace(/[ğ]/g,'g')
-    .replace(/[ç]/g,'c').replace(/[ö]/g,'o').replace(/[ü]/g,'u') // TR harfleri dönüştür
-    .replace(/[^a-z0-9 ]+/g, ' ')   // noktalama vs.
-    .replace(/\s+/g, ' ')           // çoklu boşluğu tek boşluk yap
-    .trim();
-}
-
-
   function importVouchersTSV(file){
+    if(!file){
+      alert('Dosya seçilmedi.');
+      return;
+    }
+    if(DB.vouchers.length > 0){
+      alert('Yükleme yapmadan önce tüm verileri temizleyin.');
+      return;
+    }
+    if(!currentUserCode){
+      alert('Yükleme için önce kullanıcı girişi yapın.');
+      return;
+    }
+
     const r = new FileReader();
-    r.onload = ()=>{
+    r.onload = async ()=>{
       try{
-        const text = String(r.result).replace(/\r/g,'').trim();
-        if(!text) throw new Error('Boş dosya.');
-        const lines = text.split('\n').filter(x=>x.trim().length>0);
-        if(lines.length < 2) throw new Error('Veri satırı bulunamadı.');
-        const headerLine = lines[0];
+        const raw = String(r.result ?? '').replace(/\r/g,'');
+        const text = raw.replace(/^\uFEFF/, '');
+        if(!text.trim()) throw new Error('EMPTY');
+
+        const lines = text.split('\n');
+        if(lines.length < 2) throw new Error('INVALID');
+
+        const metaLineRaw = lines[0].replace(/^\uFEFF/, '').trim();
+        if(!metaLineRaw.toUpperCase().startsWith('#META')) throw new Error('META_MISSING');
+
+        const metaParts = metaLineRaw.split('\t').slice(1).reduce((acc, part)=>{
+          const [key, ...rest] = part.split('=');
+          if(!key) return acc;
+          acc[key.trim().toLowerCase()] = rest.join('=').trim();
+          return acc;
+        }, {});
+
+        const metaCode = metaParts.code || '';
+        const metaHash = (metaParts.hash || '').toLowerCase();
+        const metaCreated = metaParts.created || '';
+        const metaApp = metaParts.app || '';
+
+        if(!metaCode || !metaHash) throw new Error('META_MISSING');
+        if(!isAdminCode(currentUserCode) && metaCode !== currentUserCode){
+          alert('Başka bir kullanıcıya ait verileri yüklemeye çalışıyorsunuz. Yeniden deneyin.');
+          return;
+        }
+
+        const dataLines = lines.slice(1);
+        while(dataLines.length && !dataLines[dataLines.length-1].trim()) dataLines.pop();
+        if(dataLines.length < 1) throw new Error('INVALID');
+
+        const dataSection = dataLines.join('\n');
+        const calculatedHash = (await computeSHA256Hex(dataSection)).toLowerCase();
+        if(calculatedHash !== metaHash){
+          alert('Yedek dosyası değiştirilmiş olabilir. Yükleme reddedildi.');
+          return;
+        }
+
+        const headerLine = dataLines[0];
+        if(!headerLine) throw new Error('INVALID');
         const delim = headerLine.includes('\t') ? '\t' : (headerLine.includes(';') ? ';' : '\t');
 
         const norm = s => String(s).toLowerCase()
@@ -2914,13 +3569,15 @@ function slugTR(s) {
         ['tarih','fisno','hesap','borc','alacak'].forEach(k=>{ if(idx[k]===-1) throw new Error(`Başlık eksik veya farklı: ${k}`); });
 
         const groups = new Map(); // key=ISO|No
-        for(let i=1;i<lines.length;i++){
-          const parts = lines[i].split(delim);
+        for(let i=1;i<dataLines.length;i++){
+          const line = dataLines[i];
+          if(!line.trim()) continue;
+          const parts = line.split(delim);
           if(parts.every(p=>!String(p).trim())) continue;
 
           const dmy = unquote(parts[idx.tarih] ?? '');
           const iso = isoFromDMY(dmy);
-          if(!iso) throw new Error(`Geçersiz tarih (${dmy}) satır ${i+1}`);
+          if(!iso) throw new Error(`Geçersiz tarih (${dmy}) satır ${i+2}`);
 
           const no   = unquote(parts[idx.fisno] ?? '').toString().trim();
           const fAc  = idx.fisac>-1 ? unquote(parts[idx.fisac] ?? '').toString().trim() : '';
@@ -2955,10 +3612,37 @@ function slugTR(s) {
         refreshVoucherList();
         renderMizan();
 
-        const msg = `TSV içe aktarma tamamlandı. Başarılı fiş: ${ok}${fail?`, Hatalı: ${fail}`:''}`;
-        if(fail) alert(msg + '\nİlk hata: ' + (errs[0]||'')); else alert(msg);
+        if(fail){
+          const msg = `TSV içe aktarma tamamlandı. Başarılı fiş: ${ok}, Hatalı: ${fail}`;
+          alert(msg + '\nİlk hata: ' + (errs[0]||''));
+          return;
+        }
 
-      }catch(e){ alert('TSV içe aktarma hatası: ' + e.message); }
+        const importInfo = {
+          code: metaCode,
+          backupCreatedAt: metaCreated,
+          backupApp: metaApp,
+          hash: metaHash,
+          loadedAt: new Date().toISOString(),
+        };
+        saveLastImportInfo(importInfo);
+        alert('Yedek başarıyla yüklendi.');
+      }catch(e){
+        if(e && typeof e.message === 'string'){
+          if(e.message === 'META_MISSING'){
+            alert('Yedek dosyasında kullanıcı kodu bilgisi bulunamadı. Güncel formatla alınmış bir yedek yükleyin.');
+            return;
+          }
+          if(e.message === 'EMPTY' || e.message === 'INVALID'){
+            alert('Geçersiz veya bozuk yedek dosyası. Yeniden deneyin.');
+            return;
+          }
+        }
+        alert('Geçersiz veya bozuk yedek dosyası. Yeniden deneyin.');
+      }
+    };
+    r.onerror = ()=>{
+      alert('Geçersiz veya bozuk yedek dosyası. Yeniden deneyin.');
     };
     r.readAsText(file, 'utf-8');
   }
@@ -3138,13 +3822,21 @@ function parseNumberOrZero(s){
 
 
 
-  function clearAll(){
-    if(!confirm('Tüm verileri silmek istediğinize emin misiniz?')) return;
+  function clearAll(options={}){
+    const { skipConfirm=false, reload=false } = options;
+    if(!skipConfirm && !confirm('Tüm verileri silmek istediğinize emin misiniz?')) return;
     localStorage.removeItem(STORE_KEY);
+    clearLastImportInfo();
+    saveStoredOwnerInfo(null);
     DB.vouchers=[];
     refreshVoucherList();
     newVoucher();
     renderMizan();
+    autoClearScheduled = false;
+    updateBackupNotice();
+    if(reload){
+      setTimeout(()=>window.location.reload(), 50);
+    }
   }
 
   // ---------- "Kalanı Dengele" (odak satır öncelikli + akıllı hedef) ----------
@@ -3463,6 +4155,7 @@ function applyTemplateByKey(key){
     // Mizan
     document.getElementById('btnMizan').addEventListener('click', renderMizan);
     setupCollapsible('toggleMizan', 'mizanContent');
+    setupCollapsible('toggleWarnings', 'warningsContent');
 
     // Raporlar (yeni sekme)
     bindReportButtons();
@@ -3471,7 +4164,9 @@ function applyTemplateByKey(key){
     // Veri yönetimi
     document.getElementById('btnExportTSV').addEventListener('click', exportTSV);
     document.getElementById('fileImportTSV').addEventListener('change', e=>{
-      const f=e.target.files[0]; if(f) importVouchersTSV(f); e.target.value='';
+      const f = e.target.files[0] || null;
+      importVouchersTSV(f);
+      e.target.value='';
     });
 
     document.getElementById('btnClear').addEventListener('click', clearAll);
