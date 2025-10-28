@@ -181,6 +181,23 @@ fieldset.readonly {
   width:100%; box-sizing:border-box; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 
+/* Miktar uyarısı için satır vurgusu */
+#voucherTable tbody tr.voucher-missing-qty td{
+  background:#ffe4ec !important;
+}
+#voucherTable tbody tr.voucher-qty-unexpected td{
+  background:#fef3c7 !important;
+}
+#v_qty_alerts{
+  display:none;
+  color:#b91c1c;
+  font-size:13px;
+  margin-top:6px;
+}
+#v_qty_alerts div{
+  margin-top:2px;
+}
+
 /* 2) Borç / Alacak / Miktar daralt */
 #voucherTable thead th:nth-child(2),
 #voucherTable thead th:nth-child(3){ width:110px !important; }
@@ -327,6 +344,7 @@ fieldset.readonly {
           </select>
         </div>
       </div>
+      <div id="v_qty_alerts" role="alert" aria-live="assertive"></div>
 
     </fieldset>
 
@@ -1614,8 +1632,15 @@ function prepareYansitmaTemplate(opts = {}){
   [sel, dr, cr, qty, dc].forEach(el=>{
     el.addEventListener('focus', ()=>{ CURRENT_VOUCHER_ROW = tr; });
   });
-  sel.addEventListener('change', markDirty);
+  sel.addEventListener('change', ()=>{
+    markDirty();
+    recalcVoucherTotals();
+  });
   dc.addEventListener('input', markDirty);
+  qty.addEventListener('input', ()=>{
+    markDirty();
+    recalcVoucherTotals();
+  });
 
   recalcVoucherTotals();
   return tr;
@@ -1671,9 +1696,52 @@ function prepareYansitmaTemplate(opts = {}){
     const btn=document.getElementById('v_save');
     btn.disabled = READONLY_MODE || !ok;
     btn.title= ok? '' : 'Fiş en az 2 dolu satır içermeli ve Toplam Borç = Toplam Alacak olmalı';
+
+    updateVoucherQuantityWarnings();
   }
 
   // ---------- Düzenleme modu (Pasif/Aktif) ----------
+function updateVoucherQuantityWarnings(){
+  const rows = document.querySelectorAll('#voucherTable tbody tr');
+  let missing153 = false;
+  let missing600 = false;
+  let unexpectedQty = false;
+
+  rows.forEach(tr=>{
+    tr.classList.remove('voucher-missing-qty', 'voucher-qty-unexpected');
+    const accSelect = tr.querySelector('td:first-child select');
+    const qtyInput = tr.querySelector('td:nth-child(4) input');
+    if (!accSelect) return;
+    const code = (accSelect.value || '').trim();
+    const qtyVal = qtyInput ? toNum(qtyInput.value) : 0;
+    if (code === '153' || code === '600'){
+      if (Math.abs(qtyVal) <= WARN_EPS){
+        tr.classList.add('voucher-missing-qty');
+        if (code === '153') missing153 = true;
+        if (code === '600') missing600 = true;
+      }
+    } else if (Math.abs(qtyVal) > WARN_EPS){
+      tr.classList.add('voucher-qty-unexpected');
+      unexpectedQty = true;
+    }
+  });
+
+  const alertBox = document.getElementById('v_qty_alerts');
+  if (!alertBox) return;
+  const messages = [];
+  if (missing153) messages.push('153 hesap kullandınız ve miktar bilgisi girmediniz. Kontrol ediniz.');
+  if (missing600) messages.push('600 hesap kullandınız ve miktar bilgisi girmediniz. Kontrol ediniz.');
+  if (unexpectedQty) messages.push('153 ve 600 hesap dışında bir hesaba miktar bilgisi giriyorsunuz. Emin misiniz?');
+
+  if (messages.length){
+    alertBox.innerHTML = messages.map(msg => `<div>${escapeHTML(msg)}</div>`).join('');
+    alertBox.style.display = 'block';
+  } else {
+    alertBox.innerHTML = '';
+    alertBox.style.display = 'none';
+  }
+}
+
 function setVoucherEditable(isEditable){
   READONLY_MODE = !isEditable;
 
@@ -2243,6 +2311,9 @@ function updateWarningsArea(map, rows, range){
     warnings.push('Satış miktarı alış miktarından fazla. Kontrol ediniz');
   }
 
+  const missingQtyWarnings = computeMissingQuantityWarnings(range);
+  warnings.push(...missingQtyWarnings);
+
   const yansitmaPairs = [['760','761'], ['770','771'], ['780','781']];
   const problematicPairs = [];
   yansitmaPairs.forEach(([a, b]) => {
@@ -2260,6 +2331,59 @@ function updateWarningsArea(map, rows, range){
   }
 
   updateWarningsDisplay(warnings);
+}
+
+function inRangeVoucherForRange(v, range){
+  if (!range) return true;
+  const d = parseDateInput(ymd(v.date));
+  if (range.from && d < range.from) return false;
+  if (range.to && d > range.to) return false;
+  return true;
+}
+
+function computeMissingQuantityWarnings(range){
+  const warnings = [];
+  const hasSameDayWithQty = new Map();
+  const candidates = [];
+
+  DB.vouchers.forEach(voucher => {
+    if (!inRangeVoucherForRange(voucher, range)) return;
+
+    const isoDate = ymd(voucher.date);
+    let hasTargetAccount = false;
+    let hasQuantityLine = false;
+
+    (voucher.lines || []).forEach(ln => {
+      const code = String(ln.account || '').trim();
+      if (code === '153' || code === '600'){
+        hasTargetAccount = true;
+        if (toNum(ln.quantity) !== 0){
+          hasQuantityLine = true;
+        }
+      }
+    });
+
+    if (!hasTargetAccount) return;
+    if (hasQuantityLine){
+      hasSameDayWithQty.set(isoDate, true);
+      return;
+    }
+
+    hasSameDayWithQty.set(isoDate, hasSameDayWithQty.get(isoDate) || false);
+    candidates.push({
+      isoDate,
+      displayDate: dmyFromISO(isoDate),
+      no: voucher.no
+    });
+  });
+
+  candidates.forEach(item => {
+    if (!hasSameDayWithQty.get(item.isoDate)) return;
+    const displayNo = item.no == null ? '(Fiş No yok)' : String(item.no);
+    warnings.push(`${item.displayDate} tarihli ve ${displayNo} nolu fişte miktar bilgisi girilmemiştir. Kontrol ediniz.`);
+  });
+
+  return warnings;
 }
 
 function computeBalanceSheetTotals(range){
