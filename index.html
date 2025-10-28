@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Genel Muhasebe (Tek Dosya)</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Segoe UI' font-size='18' fill='%23ffffff' font-weight='700'%3EM%3C/text%3E%3C/svg%3E">
   <style>
     :root{ --bg:#f7f7f9; --card:#fff; --text:#111; --muted:#6b7280; --line:#e5e7eb; --brand:#111827; }
     *{box-sizing:border-box}
@@ -1333,6 +1334,153 @@ function prepareYansitmaTemplate(opts = {}){
     });
   }
 
+  // ---------- Hesap Kodu Dropdown Filtreleme ----------
+  const ACCOUNT_FILTER_RESET_MS = 2000;
+
+  function attachAccountPrefixFilter(select){
+    if (!select) return;
+
+    const captureOptions = () => Array.from(select.options || []).map(opt => ({
+      value      : opt.value,
+      text       : opt.textContent,
+      title      : opt.title || '',
+      disabled   : !!opt.disabled,
+      dataset    : {...opt.dataset},
+      valueLower : String(opt.value || '').toLowerCase(),
+    }));
+
+    let state = select._accFilterState;
+    if (!state){
+      state = {
+        prefix   : '',
+        timerId  : null,
+        allOptions: captureOptions(),
+      };
+
+      const clearTimer = () => {
+        if (state.timerId){
+          clearTimeout(state.timerId);
+          state.timerId = null;
+        }
+      };
+
+      const rebuildOptions = () => {
+        const lower = state.prefix.toLowerCase();
+        const filtered = state.allOptions.filter(opt => {
+          if (!state.prefix) return true;
+          if (!opt.value) return true;
+          return opt.valueLower.startsWith(lower);
+        });
+
+        const previousValue = select.value;
+        select.innerHTML = '';
+
+        filtered.forEach(data => {
+          const opt = document.createElement('option');
+          opt.value = data.value;
+          opt.textContent = data.text;
+          if (data.title) opt.title = data.title;
+          if (data.disabled) opt.disabled = true;
+          Object.keys(data.dataset || {}).forEach(key => {
+            opt.dataset[key] = data.dataset[key];
+          });
+          select.appendChild(opt);
+        });
+
+        if (filtered.some(opt => opt.value === previousValue)){
+          select.value = previousValue;
+        } else if (filtered.length){
+          const firstSelectable = filtered.find(opt => opt.value);
+          if (firstSelectable){
+            select.value = firstSelectable.value;
+          } else {
+            select.selectedIndex = 0;
+          }
+        }
+      };
+
+      const resetFilter = () => {
+        state.prefix = '';
+        clearTimer();
+        delete select.dataset.filterPrefix;
+        rebuildOptions();
+      };
+
+      const scheduleReset = () => {
+        clearTimer();
+        if (!state.prefix) return;
+        state.timerId = setTimeout(resetFilter, ACCOUNT_FILTER_RESET_MS);
+      };
+
+      const applyFilter = () => {
+        if (!state.prefix){
+          resetFilter();
+          return;
+        }
+        rebuildOptions();
+        select.dataset.filterPrefix = state.prefix;
+      };
+
+      select.addEventListener('keydown', event => {
+        if (/^[0-9]$/.test(event.key)){
+          event.preventDefault();
+          state.prefix += event.key;
+          applyFilter();
+          scheduleReset();
+          return;
+        }
+
+        if (event.key === 'Backspace'){
+          if (!state.prefix) return;
+          event.preventDefault();
+          state.prefix = state.prefix.slice(0, -1);
+          if (state.prefix){
+            applyFilter();
+            scheduleReset();
+          } else {
+            resetFilter();
+          }
+          return;
+        }
+
+        if (event.key === 'Escape'){
+          if (!state.prefix) return;
+          event.preventDefault();
+          resetFilter();
+          return;
+        }
+
+        if (!state.prefix) return;
+
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(event.key)){
+          scheduleReset();
+          return;
+        }
+
+        if (event.key === 'Tab' || event.key === 'Enter'){
+          resetFilter();
+        }
+      });
+
+      select.addEventListener('blur', resetFilter);
+
+      select._accFilterState = state;
+      select.dataset.accFilterAttached = '1';
+      state.rebuildOptions = rebuildOptions;
+      state.resetFilter = resetFilter;
+      state.applyFilter = applyFilter;
+      state.scheduleReset = scheduleReset;
+      state.clearTimer = clearTimer;
+    }
+
+    if (!state.prefix){
+      state.allOptions = captureOptions();
+      state.resetFilter();
+    } else {
+      state.applyFilter();
+    }
+  }
+
   // ---------- Fiş Girişi ----------
   function makeAccSelect(){
     const sel=document.createElement('select');
@@ -1351,6 +1499,7 @@ function prepareYansitmaTemplate(opts = {}){
     sel.addEventListener('focus', ()=>{
       if (sel.value) LAST_USED_ACCOUNT = sel.value;
     });
+    attachAccountPrefixFilter(sel);
     return sel;
   }
 
@@ -1766,24 +1915,88 @@ function deleteVoucher(){
     updateVoucherSortButtons();
   }
 
-  function loadSelectedVoucher(){
-    const sel=document.getElementById('v_select'); if(!sel.value) return;
-    const [d,no]=sel.value.split('|');
-    const v=DB.vouchers.find(x=>ymd(x.date)===d && String(x.no)===no);
-    if(!v) return;
-    document.getElementById('v_tarih').value=ymd(v.date);
-    document.getElementById('v_fisno').value=v.no;
+  function populateVoucherFormFromVoucher(v, opts = {}){
+    if (!v) return false;
+
+    const isoDate = ymd(v.date);
+    document.getElementById('v_tarih').value = isoDate;
+    document.getElementById('v_fisno').value = v.no;
     document.getElementById('v_desc').value = v.desc || '';
-    const tbody=document.querySelector('#voucherTable tbody'); tbody.innerHTML='';
-    (v.lines||[]).forEach(ln=> addVoucherRow({account:ln.account, debit:ln.debit, credit:ln.credit, quantity:ln.quantity, desc:ln.desc}));
-    if((v.lines||[]).length===0){ addVoucherRow(); addVoucherRow(); }
+
+    const tbody = document.querySelector('#voucherTable tbody');
+    if (tbody){
+      tbody.innerHTML = '';
+      const lines = Array.isArray(v.lines) ? v.lines : [];
+      if (!lines.length){
+        addVoucherRow(); addVoucherRow();
+      } else {
+        lines.forEach(ln=> addVoucherRow({
+          account : ln.account,
+          debit   : ln.debit,
+          credit  : ln.credit,
+          quantity: ln.quantity,
+          desc    : ln.desc
+        }));
+      }
+    }
+
     recalcVoucherTotals();
 
-    CURRENT_VOUCHER_ORIGINAL_KEY = ymd(v.date) + '|' + String(v.no);
+    CURRENT_VOUCHER_ORIGINAL_KEY = isoDate + '|' + String(v.no);
     FORM_DIRTY = false;
     setSavedMessage(false);
     setVoucherEditable(false); // Yüklenen geçmiş fiş pasif gelsin
 
+    const sel = document.getElementById('v_select');
+    if (sel){
+      sel.value = CURRENT_VOUCHER_ORIGINAL_KEY;
+    }
+    ensureSelectMatchesCurrent();
+
+    if (opts && typeof opts.message === 'string'){
+      const msgEl = document.getElementById('v_msg');
+      if (msgEl) msgEl.textContent = opts.message;
+    }
+
+    return true;
+  }
+
+  function loadVoucherByKey(dateInput, voucherNo, opts = {}){
+    if (!dateInput || voucherNo == null) return false;
+    const isoDate = ymd(dateInput);
+    const normalizedNo = String(voucherNo).trim();
+    if (!isoDate || !normalizedNo) return false;
+    const target = DB.vouchers.find(x=>ymd(x.date)===isoDate && String(x.no)===normalizedNo);
+    if (!target) return false;
+    return populateVoucherFormFromVoucher(target, opts);
+  }
+
+  function loadSelectedVoucher(){
+    const sel = document.getElementById('v_select');
+    if (!sel || !sel.value) return;
+    const [dateKey, voucherNo] = sel.value.split('|');
+    loadVoucherByKey(dateKey, voucherNo);
+  }
+
+  if (typeof window !== 'undefined'){
+    window.__GM_LOAD_VOUCHER_BY_KEY = (dateInput, voucherNo, opts) => loadVoucherByKey(dateInput, voucherNo, opts);
+    window.addEventListener('message', (event) => {
+      if (!event || !event.data) return;
+      const origin = event.origin || '';
+      const allowedOrigin = window.location?.origin || '';
+      if (allowedOrigin && origin && origin !== allowedOrigin && origin !== 'null') return;
+      const data = event.data;
+      if (typeof data !== 'object' || data === null) return;
+      if (data.type !== 'GM_LEDGER_VOUCHER_REQUEST') return;
+      if (!data.date || data.no == null) return;
+      const message = typeof data.message === 'string' ? data.message : 'Programda fişi güncelleyebilirsiniz.';
+      const success = !!loadVoucherByKey(data.date, data.no, { message });
+      if (event.source && typeof event.source.postMessage === 'function'){
+        try{
+          event.source.postMessage({ type: 'GM_LEDGER_VOUCHER_RESPONSE', success }, '*');
+        }catch(_){}
+      }
+    });
   }
 
 // --- Gezinme yardımcıları ---
@@ -2193,6 +2406,31 @@ function updateWarningsDisplay(warnings){
     overflow:hidden;
     text-overflow:ellipsis;
   }
+  tr[data-voucher-key]{ cursor:pointer; }
+  tr[data-voucher-key]:hover{ background:#eef2ff; }
+  .ledger-hint{ font-size:12px; color:var(--muted); margin:4px 0 8px 0; }
+  .ledger-toast{
+    position:fixed;
+    top:24px;
+    right:24px;
+    max-width:260px;
+    background:rgba(17,24,39,0.9);
+    color:#f9fafb;
+    padding:12px 16px;
+    border-radius:12px;
+    font-size:13px;
+    line-height:1.35;
+    box-shadow:0 10px 25px rgba(15,23,42,0.35);
+    opacity:0;
+    transform:translateY(-12px);
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    z-index:9999;
+  }
+  .ledger-toast.is-visible{
+    opacity:1;
+    transform:translateY(0);
+  }
 `;
 
     const now = new Date();
@@ -2248,6 +2486,106 @@ function updateWarningsDisplay(warnings){
             shell.style.maxWidth = '100%';
           }
         });
+
+        const showLedgerToast = (() => {
+          let toastEl = null;
+          let hideTimer = null;
+          return (text) => {
+            if (!text) return;
+            if (!toastEl){
+              toastEl = document.createElement('div');
+              toastEl.className = 'ledger-toast';
+              toastEl.setAttribute('role', 'status');
+              toastEl.setAttribute('aria-live', 'polite');
+              document.body.appendChild(toastEl);
+            }
+            toastEl.textContent = text;
+            toastEl.classList.add('is-visible');
+            if (hideTimer) clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => {
+              toastEl.classList.remove('is-visible');
+            }, 2000);
+          };
+        })();
+
+        document.addEventListener('dblclick', (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const tr = target.closest('tr[data-voucher-key]');
+          if (!tr) return;
+          event.preventDefault();
+
+          const date = tr.getAttribute('data-voucher-date') || '';
+          const no = tr.getAttribute('data-voucher-no') || '';
+          if (!date || !no) return;
+
+          showLedgerToast('Programda fişi güncelleyebilirsiniz.');
+
+          const openerWindow = window.opener;
+          if (!openerWindow || openerWindow.closed){
+            alert('Ana pencere açık değil veya kapatıldı.');
+            return;
+          }
+
+          const payload = {
+            type: 'GM_LEDGER_VOUCHER_REQUEST',
+            date,
+            no,
+            message: 'Programda fişi güncelleyebilirsiniz.'
+          };
+
+          try{
+            const loader = openerWindow.__GM_LOAD_VOUCHER_BY_KEY;
+            if (typeof loader === 'function'){
+              const loaded = !!loader(payload.date, payload.no, { message: payload.message });
+              if (loaded){
+                try { openerWindow.focus(); } catch (_){}
+                return;
+              }
+            }
+          }catch(err){
+            // erişim engellenirse sessizce postMessage'a düş
+          }
+
+          if (typeof openerWindow.postMessage !== 'function'){
+            alert('Fiş ana pencerede açılamadı. Lütfen ana pencereye dönerek fişi manuel açın.');
+            return;
+          }
+
+          let responseHandled = false;
+          let responseTimeout = null;
+
+          const handleResponse = (msgEvent) => {
+            const originOk = !msgEvent.origin || msgEvent.origin === window.location.origin || msgEvent.origin === 'null';
+            if (!originOk) return;
+            if (msgEvent.source !== openerWindow) return;
+            const data = msgEvent.data;
+            if (!data || data.type !== 'GM_LEDGER_VOUCHER_RESPONSE') return;
+            responseHandled = true;
+            window.removeEventListener('message', handleResponse);
+            if (responseTimeout) clearTimeout(responseTimeout);
+            if (data.success){
+              try { openerWindow.focus(); } catch (_){}
+            } else {
+              alert('Fiş ana pencerede bulunamadı.');
+            }
+          };
+
+          window.addEventListener('message', handleResponse);
+          responseTimeout = setTimeout(() => {
+            if (responseHandled) return;
+            window.removeEventListener('message', handleResponse);
+            alert('Ana pencere yanıt vermedi. Lütfen ana pencereye dönerek fişi manuel açın.');
+          }, 2000);
+
+          try{
+            openerWindow.postMessage(payload, '*');
+          }catch(err){
+            window.removeEventListener('message', handleResponse);
+            if (responseTimeout) clearTimeout(responseTimeout);
+            alert('Fiş ana pencerede açılamadı. Lütfen ana pencereye dönerek fişi manuel açın.');
+          }
+        });
       <\/script>
     </body></html>`;
     const url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
@@ -2281,6 +2619,7 @@ function updateWarningsDisplay(warnings){
       o.value=a.code; o.textContent=`${a.code}.${a.name}`;
       sel.appendChild(o);
     });
+    attachAccountPrefixFilter(sel);
   }
 
   // ---------- Raporlar ----------
@@ -2512,7 +2851,8 @@ function makeJournalReport3HTML(){
         }
       }
 
-      return `<tr>
+      const voucherKey = `${it.isoDate}|${String(it.no || '').trim()}`;
+      return `<tr data-voucher-key="${escapeHTML(voucherKey)}" data-voucher-date="${escapeHTML(it.isoDate)}" data-voucher-no="${escapeHTML(String(it.no || ''))}" title="Fiş detayını yüklemek için çift tıklayın">
         <td>${escapeHTML(it.tarih)}</td>
         <td>${escapeHTML(it.no)}</td>
         <td class="desc-col">${escapeHTML(it.acik)}</td>
@@ -2528,6 +2868,7 @@ function makeJournalReport3HTML(){
     const sideEnd = balance>=0 ? 'B' : 'A';
     return `
       <div><b>Hesap:</b> ${escapeHTML(accountCode + ' ' + (accMeta.name||''))}</div>
+      <p class="ledger-hint">Satıra çift tıklayarak fiş güncellenebilir.</p>
       <table>
         <thead>
           <tr>
