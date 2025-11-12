@@ -245,6 +245,17 @@ fieldset.readonly {
       <button type="submit" class="primary">Giriş Yap</button>
     </form>
   </div>
+  <div id="tplWorkerModal" class="login-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tplWorkerTitle">
+    <div class="login-card" role="document">
+      <h2 id="tplWorkerTitle">Ücret Tahakkuku</h2>
+      <label for="tplWorkerCount">Asgari ücretli sayısı belirtiniz</label>
+      <input type="number" id="tplWorkerCount" min="1" step="1" value="1" inputmode="numeric" />
+      <div class="row row-nowrap" style="justify-content:flex-end; margin-top:8px;">
+        <button type="button" id="tplWorkerCancel">İptal</button>
+        <button type="button" id="tplWorkerConfirm" class="primary">Devam</button>
+      </div>
+    </div>
+  </div>
   <div class="container">
     <div class="app-header">
       <h1>Genel Muhasebe Programı</h1>
@@ -338,7 +349,7 @@ fieldset.readonly {
             <option value="demirbas">Demirbaş Alımı</option>
             <option value="banka2kasa">Bankadan Kasaya</option>
             <option value="smm">Satılan Mal Maliyeti</option>
-            <option value="ucret">Ücret Hakedişi</option>
+            <option value="ucretAsgari">Ücret Tahakkuku Asgari Ücret</option>
             <option value="yansitma">Yansıtma Kaydı</option>
 
           </select>
@@ -949,10 +960,13 @@ fieldset.readonly {
   ];
 
 
-  const STORE_KEY = 'bmuhasebe_v2_vouchers_only';
-  const STORE_LAST_IMPORT_KEY = 'bmuhasebe_v2_last_import_meta';
-  const STORE_OWNER_KEY = 'bmuhasebe_v2_owner';
-  const APP_VERSION = '1.0.0';
+const STORE_KEY = 'bmuhasebe_v2_vouchers_only';
+const STORE_LAST_IMPORT_KEY = 'bmuhasebe_v2_last_import_meta';
+const STORE_OWNER_KEY = 'bmuhasebe_v2_owner';
+const APP_VERSION = '1.0.0';
+const ASGARI_UCRET = 26005.50;
+const ASGARI_UCRET_BRUT_MULTIPLIER = 1.1775;
+const ASGARI_UCRET_SGK_MULTIPLIER = 0.3275;
   let DB = { vouchers: [] }; // {date,no,desc,lines:[{account,debit,credit,quantity,desc}]}
   let lastImportInfo = null;
   let storedOwnerInfo = null;
@@ -2643,19 +2657,22 @@ function updateWarningsDisplay(warnings){
           const no = tr.getAttribute('data-voucher-no') || '';
           if (!date || !no) return;
 
-          showLedgerToast('Programda fişi güncelleyebilirsiniz.');
-
           const openerWindow = window.opener;
           if (!openerWindow || openerWindow.closed){
             alert('Ana pencere açık değil veya kapatıldı.');
             return;
           }
 
+          const redirectToMain = () => {
+            try { openerWindow.focus(); } catch (_){}
+            try { window.close(); } catch (_){}
+          };
+
           const payload = {
             type: 'GM_LEDGER_VOUCHER_REQUEST',
             date,
             no,
-            message: 'Programda fişi güncelleyebilirsiniz.'
+            message: 'Fiş ana ekranda açıldı.'
           };
 
           try{
@@ -2663,7 +2680,7 @@ function updateWarningsDisplay(warnings){
             if (typeof loader === 'function'){
               const loaded = !!loader(payload.date, payload.no, { message: payload.message });
               if (loaded){
-                try { openerWindow.focus(); } catch (_){}
+                redirectToMain();
                 return;
               }
             }
@@ -2689,7 +2706,7 @@ function updateWarningsDisplay(warnings){
             window.removeEventListener('message', handleResponse);
             if (responseTimeout) clearTimeout(responseTimeout);
             if (data.success){
-              try { openerWindow.focus(); } catch (_){}
+              redirectToMain();
             } else {
               alert('Fiş ana pencerede bulunamadı.');
             }
@@ -4384,8 +4401,69 @@ function parseNumberOrZero(s){
     recalcVoucherTotals();
   }
   
+function showWorkerCountPrompt(){
+  return new Promise(resolve=>{
+    const modal = document.getElementById('tplWorkerModal');
+    const input = document.getElementById('tplWorkerCount');
+    const confirmBtn = document.getElementById('tplWorkerConfirm');
+    const cancelBtn = document.getElementById('tplWorkerCancel');
+
+    if (!modal || !input || !confirmBtn || !cancelBtn){
+      resolve(null);
+      return;
+    }
+
+    const cleanup = ()=>{
+      modal.classList.add('hidden');
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      modal.removeEventListener('keydown', onKeyDown);
+    };
+
+    const onConfirm = ()=>{
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value <= 0){
+        input.focus();
+        input.select();
+        return;
+      }
+      const safeValue = Math.floor(value);
+      input.value = safeValue;
+      cleanup();
+      resolve(safeValue);
+    };
+
+    const onCancel = ()=>{
+      cleanup();
+      resolve(null);
+    };
+
+    const onKeyDown = (evt)=>{
+      if (evt.key === 'Escape'){
+        evt.preventDefault();
+        onCancel();
+      } else if (evt.key === 'Enter'){
+        evt.preventDefault();
+        onConfirm();
+      }
+    };
+
+    modal.classList.remove('hidden');
+    const initialVal = Number(input.value);
+    input.value = Number.isFinite(initialVal) && initialVal > 0 ? Math.floor(initialVal) : 1;
+    setTimeout(()=>{
+      input.focus();
+      input.select();
+    }, 0);
+
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('keydown', onKeyDown);
+  });
+}
+
 // ---------- ŞABLONLAR (Dropdown) ----------
-function applyTemplateByKey(key){
+function applyTemplateByKey(key, opts = {}){
   // Pasif fişte çalışmasın
   if (READONLY_MODE){
     alert('Bu fiş pasif. Şablon kullanmak için "Fişi Güncelle" ile düzenlemeyi açın.');
@@ -4423,7 +4501,33 @@ function applyTemplateByKey(key){
   }
   tbody.innerHTML = '';
 
-  if (key === 'alis'){
+  if (key === 'ucretAsgari'){
+    const workerCountRaw = Number(opts.workerCount);
+    const workerCount = Number.isFinite(workerCountRaw) && workerCountRaw > 0
+      ? Math.floor(workerCountRaw)
+      : 0;
+
+    if (!workerCount){
+      const sel = document.getElementById('tplSelect');
+      if (sel) sel.value = '';
+      return;
+    }
+
+    const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
+    const brut = round2(ASGARI_UCRET * ASGARI_UCRET_BRUT_MULTIPLIER * workerCount);
+    const sgk = round2(ASGARI_UCRET * ASGARI_UCRET_SGK_MULTIPLIER * workerCount);
+    const brutCents = Math.round(brut * 100);
+    const sgkCents = Math.round(sgk * 100);
+    const net = round2((brutCents - sgkCents) / 100);
+    const employeeLabel = `${workerCount} çalışan için`;
+
+    addVoucherRow({ account:'632', debit: brut,  desc:`${employeeLabel} brüt ücret + işveren payları` });
+    addVoucherRow({ account:'361', credit: sgk, desc:`${employeeLabel} işçi ve işveren SGK kesintileri` });
+    addVoucherRow({ account:'335', credit: net, desc:`${employeeLabel} ödenecek net ücretler` });
+
+    document.getElementById('v_desc').value = `${employeeLabel} ücret tahakkuku`;
+  }
+  else if (key === 'alis'){
     const randomAmount = randomThousandBetween(50000, 100000);
     const kdvAmount = randomAmount * 0.20;
     const totalAmount = randomAmount + kdvAmount;
@@ -4513,16 +4617,6 @@ function applyTemplateByKey(key){
 
     document.getElementById('v_desc').value = 'Satılan Mal Maliyeti';
   }
-  else if (key === 'ucret'){
-    // Ücret Hakedişi
-    const tutar = randomThousandBetween(30000, 50000); // 30.000–50.000
-
-    addVoucherRow({ account:'632', debit: tutar,  desc:'ücret hakedişi' });
-    addVoucherRow({ account:'335', credit: tutar, desc:'ücret hakedişi' });
-
-    document.getElementById('v_desc').value = 'Ücret Hakedişi';
-  }
-
   markDirty();
   recalcVoucherTotals();
 
@@ -4612,9 +4706,28 @@ function applyTemplateByKey(key){
     document.getElementById('v_new').addEventListener('click', newVoucher);
     document.getElementById('v_delete').addEventListener('click', deleteVoucher);
     // Şablon seçimi
-    document.getElementById('tplSelect').addEventListener('change', (e)=>{
-      const val = e.target.value;
-      if (val) applyTemplateByKey(val);
+    document.getElementById('tplSelect').addEventListener('change', async (e)=>{
+      const sel = e.target;
+      const val = sel.value;
+      if (!val) return;
+
+      if (val === 'ucretAsgari'){
+        if (READONLY_MODE){
+          applyTemplateByKey(val);
+          return;
+        }
+
+        const workerCount = await showWorkerCountPrompt();
+        if (workerCount){
+          applyTemplateByKey(val, { workerCount });
+        } else {
+          sel.value = '';
+          sel.focus();
+        }
+        return;
+      }
+
+      applyTemplateByKey(val);
     });
 
     // Mizan
